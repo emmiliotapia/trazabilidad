@@ -397,24 +397,43 @@ button[type='submit']:hover { background: #2f4352; }
 .pila i.sin { background: #ff9a92; }
 .pila small { margin-left: 0.4rem; color: #dbe6ee; }
 
-.misiones .nota-larga { margin-top: -0.2rem; }
-.lista-misiones { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.4rem; }
-.mision { border: 1px solid var(--linea); border-radius: 5px; padding: 0.45rem 0.65rem; background: #fff; }
-.mision p { margin: 0.2rem 0 0 1.75rem; font-size: 0.84rem; color: var(--tinta-2); }
-.mision-cab { display: flex; gap: 0.5rem; align-items: center; }
-.mision-cab b { font: 600 1rem var(--cond); }
-.mision .check { width: 1.25rem; height: 1.25rem; border-radius: 50%; border: 2px solid var(--linea); display: grid; place-items: center; font-size: 0.75rem; font-weight: 700; color: #fff; flex: none; }
-.mision.hecha { background: #f1f8f3; border-color: #b9dcc6; }
-.mision.hecha .check { background: var(--verde); border-color: var(--verde); }
-.mision.actual { border: 2px solid var(--tinta); }
-.mision .aprende { color: var(--tinta); background: var(--rol-plan); padding: 0.35rem 0.5rem; border-radius: 3px; }
-.mision.hecha .aprende { background: transparent; padding: 0; color: #3f6b4f; }
-.subpasos { display: flex; gap: 0.3rem; margin: 0.35rem 0 0 1.75rem; }
-.subpasos span { font-size: 0.76rem; padding: 0.1rem 0.5rem; border-radius: 10px; border: 1px solid var(--linea); color: var(--tinta-2); }
-.subpasos span.ok { background: var(--verde); border-color: var(--verde); color: #fff; }
-.reiniciar { text-align: right; }
+.columna-der { display: grid; gap: 1rem; align-content: start; min-width: 0; }
 
-.etiquetas { margin-top: 1rem; }
+.misiones-cab { display: flex; align-items: center; gap: 0.8rem; margin-bottom: 0.6rem; }
+.misiones-cab h2 { margin: 0; white-space: nowrap; }
+.puntos { list-style: none; display: flex; gap: 5px; margin: 0; padding: 0; flex: 1; }
+.puntos button { width: 22px; height: 8px; border-radius: 4px; border: none; padding: 0; background: var(--linea); cursor: pointer; transition: background 0.2s, width 0.2s; }
+.puntos button.hecha { background: var(--verde); }
+.puntos button.viendo { width: 34px; outline: 2px solid var(--tinta); outline-offset: 1px; }
+.puntos button:focus-visible { outline: 2px solid var(--tinta); outline-offset: 2px; }
+.flechas { display: flex; gap: 4px; }
+.flechas button { width: 30px; height: 30px; border-radius: 4px; border: 1px solid var(--linea); background: #fff; font-size: 1.2rem; line-height: 1; cursor: pointer; color: var(--tinta); }
+.flechas button:hover:not(:disabled) { border-color: var(--tinta); }
+.flechas button:disabled { opacity: 0.35; cursor: default; }
+
+.mision { border: 2px solid var(--tinta); border-radius: 6px; padding: 0.7rem 0.85rem; background: #fff; display: grid; gap: 0.45rem; }
+.mision p { margin: 0; font-size: 0.9rem; }
+.mision .pasos { font-size: 0.95rem; color: var(--tinta); }
+.mision-cab { display: flex; gap: 0.55rem; align-items: center; }
+.mision-cab b { font: 600 1.2rem var(--cond); }
+.mision .check { width: 1.6rem; height: 1.6rem; border-radius: 50%; border: 2px solid var(--tinta); display: grid; place-items: center; font: 700 0.85rem var(--cond); color: var(--tinta); flex: none; }
+.mision .sello { margin-left: auto; font: 600 0.8rem var(--cond); color: var(--verde); border: 1px solid var(--verde); border-radius: 10px; padding: 0.05rem 0.55rem; }
+.mision.hecha { border-color: var(--verde); background: #f1f8f3; }
+.mision.hecha .check { background: var(--verde); border-color: var(--verde); color: #fff; }
+.mision .aprende { color: var(--tinta); background: var(--rol-plan); padding: 0.45rem 0.6rem; border-radius: 3px; font-size: 0.86rem; }
+.mision.hecha .aprende { background: #e1f1e6; }
+.mision-pie { display: flex; justify-content: space-between; align-items: center; gap: 1rem; font-size: 0.8rem; color: var(--tinta-2); }
+.mision-pie .btn-texto:last-child { margin-left: auto; }
+.mision.celebra { animation: celebra 0.9s ease-out; }
+.mision.celebra .siguiente::after { content: ''; display: inline-block; width: 60px; height: 3px; margin-left: 0.5rem; vertical-align: middle; background: var(--verde); animation: barra 5s linear forwards; transform-origin: left; }
+.mision.entra { animation: entra 0.35s ease-out; }
+@keyframes entra { from { opacity: 0; transform: translateX(14px); } to { opacity: 1; transform: none; } }
+@keyframes celebra { 0% { box-shadow: 0 0 0 0 rgba(35, 163, 90, 0.55); } 100% { box-shadow: 0 0 0 14px rgba(35, 163, 90, 0); } }
+@keyframes barra { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+.subpasos { display: flex; gap: 0.3rem; }
+.subpasos span { font-size: 0.8rem; padding: 0.1rem 0.6rem; border-radius: 10px; border: 1px solid var(--linea); color: var(--tinta-2); }
+.subpasos span.ok { background: var(--verde); border-color: var(--verde); color: #fff; }
+
 
 .viaje-panel { margin-top: 1rem; }
 .viaje-cab { display: flex; justify-content: space-between; align-items: baseline; }

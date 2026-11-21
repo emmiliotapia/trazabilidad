@@ -37,6 +37,7 @@ function mensaje(texto, tipo = '') {
 }
 
 // ───────────────────────── misiones ─────────────────────────
+const reducido = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const obs = JSON.parse(localStorage.getItem('misiones-obs') || '{}');
 const guardarObs = () => localStorage.setItem('misiones-obs', JSON.stringify(obs));
 function marcar(k, v = true) {
@@ -98,35 +99,97 @@ const MISIONES = [
   },
 ];
 
-function pintarMisiones() {
-  const hechas = MISIONES.filter((m) => m.hecha()).length;
-  $('#m-progreso').textContent = `${hechas} de ${MISIONES.length}`;
-  const actual = MISIONES.find((m) => !m.hecha());
-  const items = MISIONES.map((m) => {
-    const hecha = m.hecha();
-    const li = h('li', { class: `mision${hecha ? ' hecha' : ''}${m === actual ? ' actual' : ''}` },
-      h('div', { class: 'mision-cab' }, h('span', { class: 'check', 'aria-hidden': 'true', text: hecha ? '✓' : '' }), h('b', { text: m.titulo })),
-      h('p', { text: m.pasos }));
-    if (m.id === 'arranque' && !hecha) {
-      li.append(h('div', { class: 'subpasos' }, ...['gafete', 'ot', 'qr'].map((k) =>
-        h('span', { class: vista?.lecturas?.[k] || vista?.arrancada ? 'ok' : '', text: { gafete: 'Gafete', ot: 'OT', qr: 'QR' }[k] }))));
-    }
-    if (hecha || m === actual) li.append(h('p', { class: 'aprende', text: m.aprende }));
-    return li;
-  });
+// Una misión a la vez: se muestra la pendiente; al cumplirse se celebra y pasa sola a la siguiente.
+let verIdx = null; // misión que se está mostrando (null = la primera pendiente)
+let celebrando = null; // índice de la misión recién cumplida
+let hechasAntes = new Set(MISIONES.filter((m) => m.hecha()).map((m) => m.id));
+let timerCelebrar;
+
+const primeraPendiente = () => {
+  const i = MISIONES.findIndex((m) => !m.hecha());
+  return i < 0 ? MISIONES.length - 1 : i;
+};
+
+function irA(i, animar = true) {
+  verIdx = Math.max(0, Math.min(MISIONES.length - 1, i));
+  pintarMisiones(animar);
+}
+
+function pintarMisiones(animar = false) {
+  const ahora = new Set(MISIONES.filter((m) => m.hecha()).map((m) => m.id));
+  const nueva = MISIONES.findIndex((m) => ahora.has(m.id) && !hechasAntes.has(m.id));
+  hechasAntes = ahora;
+  if (nueva >= 0) {
+    // celebrar la recién cumplida y después avanzar a la siguiente pendiente
+    celebrando = nueva;
+    verIdx = nueva;
+    animar = true;
+    clearTimeout(timerCelebrar);
+    timerCelebrar = setTimeout(() => {
+      celebrando = null;
+      verIdx = null;
+      pintarMisiones(true);
+    }, 5000);
+  }
+  const idx = verIdx ?? primeraPendiente();
+  const m = MISIONES[idx];
+  const hecha = m.hecha();
+  const total = ahora.size;
+
+  $('#m-num').textContent = `${idx + 1} de ${MISIONES.length}`;
+  $('#m-puntos').replaceChildren(...MISIONES.map((x, i) => {
+    const b = h('button', {
+      type: 'button',
+      class: `${x.hecha() ? 'hecha' : ''}${i === idx ? ' viendo' : ''}`,
+      title: x.titulo,
+      'aria-label': `${i + 1}. ${x.titulo}${x.hecha() ? ' (completada)' : ''}`,
+    });
+    b.onclick = () => irA(i);
+    return h('li', {}, b);
+  }));
+  $('#m-prev').disabled = idx === 0;
+  $('#m-next').disabled = idx === MISIONES.length - 1;
+
+  const tarjeta = h('div', { class: `mision${hecha ? ' hecha' : ''}${celebrando === idx ? ' celebra' : ''}` },
+    h('div', { class: 'mision-cab' },
+      h('span', { class: 'check', 'aria-hidden': 'true', text: hecha ? '✓' : String(idx + 1) }),
+      h('b', { text: m.titulo }),
+      hecha ? h('span', { class: 'sello', text: celebrando === idx ? '¡Lograda!' : 'Completada' }) : null),
+    h('p', { class: 'pasos', text: m.pasos }));
+  if (m.id === 'arranque' && !hecha) {
+    tarjeta.append(h('div', { class: 'subpasos' }, ...['gafete', 'ot', 'qr'].map((k) =>
+      h('span', { class: vista?.lecturas?.[k] || vista?.arrancada ? 'ok' : '', text: { gafete: 'Gafete', ot: 'OT', qr: 'QR' }[k] }))));
+  }
+  tarjeta.append(h('p', { class: 'aprende' }, h('b', { text: hecha ? 'Lo que aprendió: ' : 'Qué va a ver: ' }), m.aprende));
+
+  const pie = h('div', { class: 'mision-pie' });
+  if (celebrando === idx && total < MISIONES.length) pie.append(h('span', { class: 'siguiente', text: 'Pasando a la siguiente misión…' }));
+  else if (total === MISIONES.length) pie.append(h('span', { class: 'siguiente', text: 'Completó las 7 misiones.' }));
+  else if (idx !== primeraPendiente()) {
+    const volver = h('button', { type: 'button', class: 'btn-texto', text: 'Ir a la misión pendiente' });
+    volver.onclick = () => irA(primeraPendiente());
+    pie.append(volver);
+  }
   const reiniciar = h('button', { type: 'button', class: 'btn-texto', text: 'Reiniciar misiones' });
   reiniciar.onclick = () => {
     for (const k of Object.keys(obs)) delete obs[k];
     guardarObs();
-    pintarMisiones();
+    hechasAntes = new Set();
+    celebrando = null;
+    irA(0);
   };
-  $('#m-misiones').replaceChildren(...items, h('li', { class: 'reiniciar' }, reiniciar));
+  pie.append(reiniciar);
+  tarjeta.append(pie);
+
+  if (animar && !reducido) tarjeta.classList.add('entra');
+  $('#m-mision').replaceChildren(tarjeta);
 }
+$('#m-prev').onclick = () => irA((verIdx ?? primeraPendiente()) - 1);
+$('#m-next').onclick = () => irA((verIdx ?? primeraPendiente()) + 1);
 
 // ───────────────────────── animación del viaje ─────────────────────────
 const cola = [];
 let animando = false;
-const reducido = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 function centro(i) {
   const est = document.querySelector(`#m-viaje .estacion-v[data-i="${i}"]`);

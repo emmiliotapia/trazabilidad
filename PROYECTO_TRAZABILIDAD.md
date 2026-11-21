@@ -1,6 +1,6 @@
 # Proyecto de Trazabilidad · Inyección de plástico (documento consolidado)
 
-> Generado el 2026-11-21 15:06. Este archivo se arma a partir de docs/. No editarlo a mano.
+> Generado el 2026-11-21 15:22. Este archivo se arma a partir de docs/. No editarlo a mano.
 
 
 ---
@@ -779,7 +779,7 @@ Las que están marcadas en rojo son incorrectas a propósito: un gafete no habil
 
 ### 5.4 Misiones
 
-A la derecha hay siete misiones. Se marcan solas cuando la terminal registra lo que piden, y cada una explica qué aprendió:
+A la derecha de la terminal se muestra una misión a la vez, con las etiquetas a la mano justo debajo. La misión se marca sola cuando la terminal registra lo que pide: aparece "¡Lograda!" con lo que aprendió y, a los 5 segundos, pasa sola a la siguiente. Los puntos de arriba muestran el avance (verde = completada); con ellos o con las flechas puede ver cualquier misión. **Ir a la misión pendiente** lo regresa a la que sigue. Son siete:
 
 1. **Arranque la máquina:** gafete, OT y QR.
 2. **Registre una bolsa:** pesar y escanear.

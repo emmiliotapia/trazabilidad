@@ -118,17 +118,25 @@
           </div>
         </div>
 
-        <section class="caja-panel misiones">
-          <h2>Misiones <span class="nota" id="m-progreso"></span></h2>
-          <p class="nota-larga">Cada misión enseña una parte del sistema. Se marcan solas cuando la terminal registra lo que piden.</p>
-          <ol id="m-misiones" class="lista-misiones"></ol>
-        </section>
-      </div>
+        <div class="columna-der">
+          <section class="caja-panel misiones" aria-label="Misiones">
+            <header class="misiones-cab">
+              <h2>Misión <span id="m-num"></span></h2>
+              <ol class="puntos" id="m-puntos" aria-label="Avance de misiones"></ol>
+              <div class="flechas">
+                <button type="button" id="m-prev" aria-label="Misión anterior">‹</button>
+                <button type="button" id="m-next" aria-label="Misión siguiente">›</button>
+              </div>
+            </header>
+            <div id="m-mision" class="mision-tarjeta" aria-live="polite"></div>
+          </section>
 
-      <section class="caja-panel etiquetas">
-        <h2>Etiquetas a la mano <span class="nota">haga clic en una para escanearla</span></h2>
-        <div id="m-etiquetas"></div>
-      </section>
+          <section class="caja-panel etiquetas">
+            <h2>Etiquetas a la mano <span class="nota">haga clic en una para escanearla</span></h2>
+            <div id="m-etiquetas"></div>
+          </section>
+        </div>
+      </div>
 
       <section class="caja-panel viaje-panel">
         <header class="viaje-cab">
