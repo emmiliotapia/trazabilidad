@@ -1,0 +1,16 @@
+# Despliegue del simulador detrás de Nginx Proxy Manager (red root_default).
+# El panel queda en http://aseti_trazabilidad:8080 dentro de la red; no se publican puertos al host.
+services:
+  trazabilidad:
+    build: .
+    container_name: aseti_trazabilidad
+    restart: unless-stopped
+    environment:
+      - VELOCIDAD=10
+    mem_limit: 256m
+    networks:
+      - root_default
+
+networks:
+  root_default:
+    external: true

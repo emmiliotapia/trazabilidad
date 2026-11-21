@@ -52,7 +52,7 @@ export async function iniciarWeb({ puerto, host, carpeta, mqttUrl, prefijo, relo
     const url = new URL(req.url, 'http://x');
     try {
       if (url.pathname === '/api/stream') {
-        res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' });
+        res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive', 'X-Accel-Buffering': 'no' });
         res.write(`event: inicio\ndata: ${JSON.stringify({ prefijo, fallas: FALLAS, mqtt: mqttUrl, campos: CAMPOS, tipos: TIPO, fallasCodigo: FALLA_NOMBRE, cmds: CMD_NOMBRE })}\n\n`);
         res.write(`event: estado\ndata: ${JSON.stringify(estado())}\n\n`);
         clientes.add(res);

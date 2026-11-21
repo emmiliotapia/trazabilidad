@@ -51,3 +51,19 @@ Certificado inválido (CP 01), resina incorrecta (CP 04), operador no habilitado
 - 28 nodos con un solo canal: ocupación del aire cercana al 8 % y alrededor del 12 % de tramas con colisión. Los reintentos y la eliminación de duplicados en el MES (`UNIQUE(nodo, seq)`) absorbieron las colisiones sin perder ningún evento.
 - Con una sola mesa en SM1, la estación se saturaba con 22 inyectoras; con dos mesas el flujo se mantiene. **Dato a validar con la planta.**
 - Todas las fallas programadas se detectaron, incluida la charola que llegó a SM1 sin CP 10 (detectada por el gate central).
+
+## Despliegue en servidor
+
+Con Docker, detrás de Nginx Proxy Manager:
+
+```bash
+git clone https://github.com/emmiliotapia/trazabilidad.git
+cd trazabilidad/simulador
+docker compose up -d --build
+```
+
+El contenedor `aseti_trazabilidad` escucha en el puerto 8080 dentro de la red `root_default`. No publica puertos al host, ni siquiera el broker MQTT. En el proxy, apunte el dominio a `aseti_trazabilidad:8080`.
+
+Para actualizar: `git pull && docker compose up -d --build`.
+
+El panel no pide usuario y cualquiera con el enlace puede provocar fallas o tomar una terminal. Es una demostración y no guarda datos reales.
