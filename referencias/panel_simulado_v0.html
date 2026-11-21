@@ -1,0 +1,2464 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="artifact-type" content="dashboard">
+  <meta name="design-style" content="aurora">
+  <title>Observabilidad de Trazabilidad — Líneas de Inyección de Plástico</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js"></script>
+  <script src="https://unpkg.com/lucide@1.43.0/dist/umd/lucide.min.js"></script>
+  <style>
+    :root {
+      color-scheme: dark;
+
+      /* Aurora palette */
+      --background: #0c1214;
+      --surface-container-low: #111a1e;
+      --surface-container: #152024;
+      --surface-container-high: #1c2a30;
+
+      /* Text */
+      --on-surface: #edf3f5;
+      --on-surface-variant: #94a8b0;
+
+      /* Borders */
+      --outline: #38515c;
+      --outline-variant: #213138;
+
+      /* Accents */
+      --primary: #63c7d6;
+      --on-primary: #081214;
+      --primary-container: #163840;
+      --on-primary-container: #c7f0f7;
+      --secondary: #5d7882;
+      --tertiary: #87d69b;
+      --error: #f27474;
+      --on-error: #1a0606;
+
+      /* Data series */
+      --data-1: #63c7d6;
+      --data-2: #87d69b;
+      --data-3: #e8b954;
+      --data-4: #f08c70;
+      --data-context: #415861;
+
+      /* Fonts */
+      --font-headline: 'Instrument Sans', sans-serif;
+      --font-body: 'Plus Jakarta Sans', sans-serif;
+      --font-label: 'Geist Mono', monospace;
+
+      /* Shape */
+      --rounded: 0.5rem;
+      --rounded-lg: 0.75rem;
+      --rounded-full: 9999px;
+
+      /* Effects */
+      --hairline: 1px solid var(--outline-variant);
+      --hairline-strong: 1px solid var(--outline);
+      --panel-gradient: linear-gradient(180deg, #162226 0%, #111a1e 100%);
+      --heading-tracking: -0.025em;
+      --label-tracking: 0.06em;
+      --sage-tint: color-mix(in srgb, var(--tertiary) 13%, transparent);
+      --cyan-tint: color-mix(in srgb, var(--primary) 13%, transparent);
+      --amber-tint: color-mix(in srgb, var(--warning) 14%, transparent);
+      --error-tint: color-mix(in srgb, var(--error) 14%, transparent);
+      --sage-border: color-mix(in srgb, var(--tertiary) 35%, transparent);
+      --cyan-border: color-mix(in srgb, var(--primary) 35%, transparent);
+      --amber-border: color-mix(in srgb, var(--warning) 40%, transparent);
+      --error-border: color-mix(in srgb, var(--error) 42%, transparent);
+
+      /* Shared semantic & focus */
+      --positive: #87d69b;
+      --warning: #e8b954;
+      --focus: #63c7d6;
+
+      /* Dashboard Type Scale */
+      --display-size: clamp(1.625rem, 1.3rem + 1.1vw, 2.15rem);
+      --headline-size: clamp(1.1875rem, 1.05rem + 0.45vw, 1.4rem);
+      --subhead-size: clamp(1rem, 0.95rem + 0.25vw, 1.125rem);
+      --body-size: clamp(0.9375rem, 0.9rem + 0.12vw, 1rem);
+      --label-size: 0.75rem;
+
+      /* Spacing scale */
+      --space-xs: 0.25rem;
+      --space-sm: 0.5rem;
+      --space-md: 1rem;
+      --space-lg: 1.5rem;
+      --space-xl: 2.5rem;
+      --space-2xl: 4rem;
+
+      /* Motion */
+      --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+      --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+      --dur-micro: 120ms;
+      --dur-short: 220ms;
+      --dur-long: 420ms;
+    }
+
+    /* Base reset */
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body {
+      overflow-x: clip;
+      margin: 0;
+      padding: 0;
+      background-color: var(--background);
+      color: var(--on-surface);
+      font-family: var(--font-body);
+      font-size: var(--body-size);
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+    header { position: static !important; }
+
+    .page-grid {
+      display: grid;
+      gap: var(--space-lg);
+      padding: var(--space-lg);
+      max-width: 1360px;
+      margin: 0 auto;
+      overflow: hidden;
+    }
+    .page-grid * { min-width: 0; }
+
+    /* Focus rings */
+    :focus-visible {
+      outline: 2px solid var(--focus);
+      outline-offset: 2px;
+    }
+
+    /* Typography helpers */
+    .page-header {
+      display: grid;
+      gap: var(--space-md);
+      padding-bottom: var(--space-md);
+      border-bottom: var(--hairline);
+    }
+    .header-top {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: var(--space-md);
+    }
+    .title-block {
+      max-width: 68ch;
+    }
+    .title {
+      margin: 0;
+      font-family: var(--font-headline);
+      font-size: var(--display-size);
+      font-weight: 600;
+      letter-spacing: var(--heading-tracking);
+      line-height: 1.1;
+      color: var(--on-surface);
+    }
+    .subtitle {
+      margin: var(--space-xs) 0 0 0;
+      color: var(--on-surface-variant);
+      font-size: var(--body-size);
+      line-height: 1.5;
+    }
+    .telemetry-clock {
+      font-family: var(--font-label);
+      font-size: var(--label-size);
+      letter-spacing: var(--label-tracking);
+      text-transform: uppercase;
+      color: var(--on-surface-variant);
+      text-align: right;
+    }
+    .telemetry-clock strong {
+      display: block;
+      color: var(--on-surface);
+      font-weight: 500;
+      font-size: 0.875rem;
+      font-variant-numeric: tabular-nums;
+      margin-top: var(--space-xs);
+    }
+
+    /* Controls bar */
+    .controls-bar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      gap: var(--space-md);
+      padding: var(--space-md);
+      background: var(--surface-container-low);
+      border: var(--hairline);
+      border-radius: var(--rounded-lg);
+    }
+    .control-field {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-xs);
+      flex: 1 1 210px;
+    }
+    .control-field.compact {
+      flex: 1 1 170px;
+    }
+    .field-label {
+      font-family: var(--font-label);
+      font-size: var(--label-size);
+      letter-spacing: var(--label-tracking);
+      text-transform: uppercase;
+      color: var(--on-surface-variant);
+    }
+    select, input[type="search"], button {
+      font-family: inherit;
+      font-size: 0.875rem;
+    }
+    .well-input, .well-select {
+      height: 44px;
+      background-color: var(--background);
+      color: var(--on-surface);
+      border: var(--hairline-strong);
+      border-radius: var(--rounded);
+      padding: 0 var(--space-md);
+      transition: border-color var(--dur-micro) var(--ease-out), background-color var(--dur-micro) var(--ease-out);
+    }
+    .well-select {
+      padding-right: var(--space-xl);
+      cursor: pointer;
+    }
+    .well-input:hover, .well-select:hover {
+      border-color: var(--primary);
+    }
+    .button-group {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: var(--space-sm);
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-sm);
+      min-height: 44px;
+      padding: 0 var(--space-md);
+      border-radius: var(--rounded);
+      font-family: var(--font-headline);
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: background-color var(--dur-micro) var(--ease-out), border-color var(--dur-micro) var(--ease-out), color var(--dur-micro) var(--ease-out), transform var(--dur-micro) var(--ease-out);
+      white-space: nowrap;
+    }
+    .btn:active { transform: translateY(1px); }
+    .btn-primary {
+      background-color: var(--primary);
+      color: var(--on-primary);
+    }
+    .btn-primary:hover {
+      background-color: color-mix(in srgb, var(--primary) 86%, var(--on-surface));
+    }
+    .btn-secondary {
+      background-color: transparent;
+      color: var(--on-surface);
+      border: var(--hairline-strong);
+    }
+    .btn-secondary:hover {
+      background-color: var(--surface-container-high);
+      border-color: var(--primary);
+    }
+    .btn-danger {
+      background-color: var(--error-tint);
+      color: var(--error);
+      border: 1px solid var(--error-border);
+    }
+    .btn-danger:hover {
+      background-color: color-mix(in srgb, var(--error) 24%, transparent);
+    }
+    .btn-sm {
+      min-height: 36px;
+      padding: var(--space-xs) var(--space-sm);
+      font-size: 0.75rem;
+      font-family: var(--font-label);
+    }
+    .btn[disabled] {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    /* Alert Banner (conditional containment / offline notice) */
+    .status-banner {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-md);
+      padding: var(--space-sm) var(--space-md);
+      border-radius: var(--rounded-lg);
+      border: 1px solid var(--amber-border);
+      background-color: var(--amber-tint);
+      color: var(--on-surface);
+      transition: opacity var(--dur-short) var(--ease-out);
+    }
+    .status-banner.is-critical {
+      border-color: var(--error-border);
+      background-color: var(--error-tint);
+    }
+    .status-banner.is-healthy {
+      border-color: var(--sage-border);
+      background-color: var(--sage-tint);
+    }
+    .banner-main {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      font-size: 0.875rem;
+    }
+    .banner-meta {
+      font-family: var(--font-label);
+      font-size: var(--label-size);
+      color: var(--on-surface-variant);
+    }
+
+    /* Panels */
+    .panel {
+      background: var(--panel-gradient);
+      border: var(--hairline);
+      border-radius: var(--rounded-lg);
+      padding: var(--space-lg);
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-md);
+    }
+    .panel-header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: var(--space-sm);
+      padding-bottom: var(--space-sm);
+      border-bottom: var(--hairline);
+    }
+    .section-title {
+      margin: 0;
+      font-family: var(--font-headline);
+      font-size: var(--headline-size);
+      font-weight: 600;
+      letter-spacing: var(--heading-tracking);
+      line-height: 1.15;
+      color: var(--on-surface);
+    }
+    .panel-caption {
+      font-family: var(--font-label);
+      font-size: var(--label-size);
+      letter-spacing: var(--label-tracking);
+      text-transform: uppercase;
+      color: var(--on-surface-variant);
+    }
+
+    /* Hero KPI Grid */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: var(--space-md);
+    }
+    .kpi-tile {
+      background: var(--panel-gradient);
+      border: var(--hairline);
+      border-radius: var(--rounded-lg);
+      padding: var(--space-md);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: var(--space-sm);
+    }
+    .kpi-tile.is-alert {
+      border-color: var(--error-border);
+    }
+    .kpi-tile.is-warn {
+      border-color: var(--amber-border);
+    }
+    .kpi-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: var(--space-xs);
+    }
+    .data-label {
+      font-family: var(--font-label);
+      font-size: var(--label-size);
+      letter-spacing: var(--label-tracking);
+      text-transform: uppercase;
+      color: var(--on-surface-variant);
+    }
+    .metric-value {
+      font-family: var(--font-headline);
+      font-size: clamp(1.5rem, 1.25rem + 0.8vw, 2rem);
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: var(--heading-tracking);
+      line-height: 1.08;
+      color: var(--on-surface);
+    }
+    .metric-sub {
+      font-family: var(--font-label);
+      font-size: var(--label-size);
+      color: var(--on-surface-variant);
+      font-variant-numeric: tabular-nums;
+    }
+    .metric-delta {
+      font-family: var(--font-label);
+      font-size: var(--label-size);
+      color: var(--tertiary);
+      font-variant-numeric: tabular-nums;
+    }
+    .metric-delta.is-warn { color: var(--warning); }
+    .metric-delta.is-error { color: var(--error); }
+
+    /* Status chips */
+    .status-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-xs);
+      border-radius: var(--rounded);
+      padding: 2px var(--space-sm);
+      font-family: var(--font-label);
+      font-size: var(--label-size);
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      white-space: nowrap;
+    }
+    .chip-sage {
+      background: var(--sage-tint);
+      color: var(--tertiary);
+      border: 1px solid var(--sage-border);
+    }
+    .chip-cyan {
+      background: var(--cyan-tint);
+      color: var(--primary);
+      border: 1px solid var(--cyan-border);
+    }
+    .chip-amber {
+      background: var(--amber-tint);
+      color: var(--warning);
+      border: 1px solid var(--amber-border);
+    }
+    .chip-error {
+      background: var(--error-tint);
+      color: var(--error);
+      border: 1px solid var(--error-border);
+    }
+
+    /* Progress meter inside KPI */
+    .sla-track {
+      height: 6px;
+      width: 100%;
+      background-color: var(--background);
+      border: var(--hairline);
+      border-radius: var(--rounded-full);
+      overflow: hidden;
+    }
+    .sla-fill {
+      height: 100%;
+      background-color: var(--primary);
+      border-radius: var(--rounded-full);
+      transition: width var(--dur-short) var(--ease-out), background-color var(--dur-short) var(--ease-out);
+    }
+    .sla-fill.is-warn { background-color: var(--warning); }
+    .sla-fill.is-error { background-color: var(--error); }
+
+    /* Split Asymmetric Telemetry + Backend Stack */
+    .telemetry-split {
+      display: grid;
+      grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+      gap: var(--space-lg);
+      align-items: stretch;
+    }
+    .charts-stack {
+      display: grid;
+      gap: var(--space-md);
+    }
+    .chart-card {
+      background: var(--background);
+      border: var(--hairline);
+      border-radius: var(--rounded);
+      padding: var(--space-md);
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-sm);
+    }
+    .chart-head {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: var(--space-sm);
+    }
+    .chart-title {
+      margin: 0;
+      font-family: var(--font-headline);
+      font-size: var(--subhead-size);
+      font-weight: 600;
+      color: var(--on-surface);
+    }
+    .legend-inline {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-md);
+      font-family: var(--font-label);
+      font-size: var(--label-size);
+      color: var(--on-surface-variant);
+    }
+    .legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-xs);
+    }
+    .swatch {
+      width: 10px;
+      height: 3px;
+      border-radius: var(--rounded-full);
+      display: inline-block;
+    }
+    .swatch-cyan { background-color: var(--data-1); }
+    .swatch-sage { background-color: var(--data-2); }
+    .swatch-amber { background-color: var(--data-3); }
+    .swatch-coral { background-color: var(--data-4); }
+
+    .chart-box {
+      position: relative;
+      min-height: 220px;
+      height: 220px;
+      width: 100%;
+    }
+
+    /* Backend & Pipeline Architecture Stack */
+    .pipeline-flow {
+      display: grid;
+      gap: var(--space-sm);
+    }
+    .infra-node {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: var(--space-sm);
+      padding: var(--space-md);
+      background: var(--background);
+      border: var(--hairline);
+      border-radius: var(--rounded);
+      text-align: left;
+      width: 100%;
+      cursor: pointer;
+      color: var(--on-surface);
+      transition: border-color var(--dur-micro) var(--ease-out), background-color var(--dur-micro) var(--ease-out);
+    }
+    .infra-node:hover {
+      background: var(--surface-container-high);
+      border-color: var(--outline);
+    }
+    .infra-node.is-selected {
+      border-color: var(--primary);
+      background: var(--surface-container);
+    }
+    .infra-node-title {
+      font-family: var(--font-headline);
+      font-weight: 600;
+      font-size: 0.95rem;
+      color: var(--on-surface);
+    }
+    .infra-node-sub {
+      font-family: var(--font-label);
+      font-size: var(--label-size);
+      color: var(--on-surface-variant);
+      margin-top: 2px;
+    }
+    .infra-metrics-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-md);
+      margin-top: var(--space-xs);
+      font-family: var(--font-label);
+      font-size: var(--label-size);
+      font-variant-numeric: tabular-nums;
+      color: var(--on-surface);
+    }
+    .infra-detail-box {
+      background: var(--surface-container-low);
+      border: var(--hairline);
+      border-radius: var(--rounded);
+      padding: var(--space-md);
+      display: grid;
+      gap: var(--space-sm);
+    }
+    .detail-kv-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: var(--space-sm);
+    }
+    .kv-item {
+      background: var(--background);
+      border: var(--hairline);
+      border-radius: var(--rounded);
+      padding: var(--space-sm);
+    }
+    .kv-label {
+      font-family: var(--font-label);
+      font-size: var(--label-size);
+      color: var(--on-surface-variant);
+      text-transform: uppercase;
+    }
+    .kv-val {
+      font-family: var(--font-label);
+      font-size: 0.95rem;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      color: var(--on-surface);
+      margin-top: 2px;
+    }
+
+    /* 22 Injection Machines / ESP Fleet Matrix */
+    .fleet-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 8fr) minmax(0, 4fr);
+      gap: var(--space-lg);
+      align-items: start;
+    }
+    .machines-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(min(138px, 100%), 1fr));
+      gap: var(--space-sm);
+    }
+    .machine-card {
+      background: var(--background);
+      border: var(--hairline);
+      border-radius: var(--rounded);
+      padding: var(--space-sm);
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-xs);
+      cursor: pointer;
+      text-align: left;
+      color: var(--on-surface);
+      min-height: 92px;
+      transition: border-color var(--dur-micro) var(--ease-out), background-color var(--dur-micro) var(--ease-out);
+    }
+    .machine-card:hover {
+      background: var(--surface-container-high);
+      border-color: var(--outline);
+    }
+    .machine-card.is-selected {
+      border-color: var(--primary);
+      background: var(--primary-container);
+    }
+    .machine-card.status-fail {
+      border-color: var(--error-border);
+    }
+    .machine-card.status-buffer {
+      border-color: var(--amber-border);
+    }
+    .machine-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: var(--space-xs);
+    }
+    .machine-id {
+      font-family: var(--font-headline);
+      font-weight: 600;
+      font-size: 0.9375rem;
+      font-variant-numeric: tabular-nums;
+    }
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: var(--rounded-full);
+      flex-shrink: 0;
+    }
+    .dot-ok { background-color: var(--tertiary); }
+    .dot-warn { background-color: var(--warning); }
+    .dot-err { background-color: var(--error); }
+    .machine-esp {
+      font-family: var(--font-label);
+      font-size: 0.7rem;
+      color: var(--on-surface-variant);
+    }
+    .machine-metrics {
+      display: flex;
+      justify-content: space-between;
+      font-family: var(--font-label);
+      font-size: var(--label-size);
+      font-variant-numeric: tabular-nums;
+      margin-top: auto;
+    }
+
+    /* Machine Inspector */
+    .inspector-well {
+      background: var(--background);
+      border: var(--hairline);
+      border-radius: var(--rounded);
+      padding: var(--space-md);
+      display: grid;
+      gap: var(--space-md);
+      container-type: inline-size;
+    }
+    .inspector-stats {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: var(--space-sm);
+    }
+
+    /* 16 Checkpoints Grid */
+    .cp-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(min(155px, 100%), 1fr));
+      gap: var(--space-sm);
+    }
+    .cp-card {
+      background: var(--background);
+      border: var(--hairline);
+      border-radius: var(--rounded);
+      padding: var(--space-sm);
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-xs);
+      text-align: left;
+      cursor: pointer;
+      color: var(--on-surface);
+      min-height: 98px;
+      transition: border-color var(--dur-micro) var(--ease-out), background-color var(--dur-micro) var(--ease-out);
+    }
+    .cp-card:hover {
+      background: var(--surface-container-high);
+      border-color: var(--outline);
+    }
+    .cp-card.is-selected {
+      border-color: var(--primary);
+      background: var(--primary-container);
+    }
+    .cp-card.has-containment {
+      border-color: var(--error-border);
+    }
+    .cp-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: var(--space-xs);
+    }
+    .cp-code {
+      font-family: var(--font-label);
+      font-weight: 600;
+      font-size: 0.8125rem;
+      color: var(--primary);
+    }
+    .cp-name {
+      font-size: 0.8125rem;
+      font-weight: 500;
+      line-height: 1.25;
+      color: var(--on-surface);
+    }
+    .cp-counts {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-family: var(--font-label);
+      font-size: 0.72rem;
+      font-variant-numeric: tabular-nums;
+      margin-top: auto;
+      padding-top: var(--space-xs);
+      border-top: var(--hairline);
+    }
+    .cp-pass { color: var(--tertiary); }
+    .cp-fail { color: var(--error); }
+
+    /* Containment & Events Log Table */
+    .events-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: var(--space-md);
+    }
+    .segmented-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-xs);
+    }
+    .seg-btn {
+      min-height: 44px;
+      padding: 0 var(--space-md);
+      border-radius: var(--rounded);
+      border: var(--hairline-strong);
+      background: var(--background);
+      color: var(--on-surface-variant);
+      font-family: var(--font-label);
+      font-size: var(--label-size);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      cursor: pointer;
+      transition: background-color var(--dur-micro) var(--ease-out), color var(--dur-micro) var(--ease-out), border-color var(--dur-micro) var(--ease-out);
+    }
+    .seg-btn:hover {
+      color: var(--on-surface);
+      border-color: var(--primary);
+    }
+    .seg-btn.is-active {
+      background: var(--primary-container);
+      color: var(--on-primary-container);
+      border-color: var(--primary);
+    }
+
+    .table-scroll {
+      overflow-x: auto;
+      max-height: 430px;
+      overflow-y: auto;
+      border: var(--hairline);
+      border-radius: var(--rounded);
+      background: var(--background);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 0.875rem;
+    }
+    thead th {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      background: var(--surface-container);
+      border-bottom: var(--hairline-strong);
+      padding: var(--space-sm) var(--space-md);
+      font-family: var(--font-label);
+      font-size: var(--label-size);
+      font-weight: 500;
+      letter-spacing: var(--label-tracking);
+      text-transform: uppercase;
+      color: var(--on-surface-variant);
+      white-space: nowrap;
+    }
+    tbody td {
+      padding: var(--space-sm) var(--space-md);
+      border-bottom: var(--hairline);
+      vertical-align: middle;
+    }
+    tbody tr:hover {
+      background-color: var(--surface-container-low);
+    }
+    tbody tr.row-fail {
+      background-color: color-mix(in srgb, var(--error) 6%, transparent);
+    }
+    .num-cell {
+      text-align: right;
+      font-family: var(--font-label);
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+    .mono-cell {
+      font-family: var(--font-label);
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+
+    .footer-note {
+      padding-top: var(--space-md);
+      border-top: var(--hairline);
+      color: var(--on-surface-variant);
+      font-size: 0.8125rem;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: var(--space-sm);
+    }
+
+    /* Responsive adaptations */
+    @media (max-width: 1120px) {
+      .kpi-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+      .telemetry-split,
+      .fleet-layout {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+    @media (max-width: 640px) {
+      .page-grid {
+        padding: var(--space-sm);
+        gap: var(--space-md);
+      }
+      .kpi-grid {
+        grid-template-columns: repeat(1, minmax(0, 1fr));
+      }
+      .telemetry-clock {
+        text-align: left;
+      }
+      .panel {
+        padding: var(--space-md);
+      }
+      .detail-kv-grid,
+      .inspector-stats {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page-grid">
+    <!-- Encabezado y controles operativos -->
+    <header class="page-header">
+      <div class="header-top">
+        <div class="title-block">
+          <h1 class="title">Observabilidad de Trazabilidad en Líneas de Inyección</h1>
+          <p class="subtitle">
+            Monitoreo operativo Edge-to-Cloud para 22 máquinas con terminales ESP, validación de gates en Edge (&lt; 100 ms), buffer SQLite offline, broker Mosquitto MQTT, 16 Checkpoints de contención y backend FastAPI · Redis · MySQL.
+          </p>
+        </div>
+        <div class="telemetry-clock" aria-live="polite">
+          Último muestreo de planta
+          <strong id="clock-readout">--:--:--</strong>
+        </div>
+      </div>
+
+      <div class="controls-bar" role="region" aria-label="Controles de simulación y filtrado de planta">
+        <div class="control-field">
+          <label class="field-label" for="scenario-select">Escenario operativo</label>
+          <select id="scenario-select" class="well-select" onchange="setScenario(this.value)">
+            <option value="nominal">Operación nominal (SLA &lt; 100 ms)</option>
+            <option value="mqtt_burst">Ráfaga de tráfico MQTT (pico de producción)</option>
+            <option value="offline_buffer">Pérdida de enlace WAN (Buffer SQLite Offline)</option>
+            <option value="containment_spike">Incidencia de calidad (Contención FAIL en Gates)</option>
+          </select>
+        </div>
+
+        <div class="control-field compact">
+          <label class="field-label" for="line-select">Línea / Zona de inyección</label>
+          <select id="line-select" class="well-select" onchange="setLineFilter(this.value)">
+            <option value="ALL">Todas las líneas (22 máq.)</option>
+            <option value="A">Línea A · INJ-01 a INJ-06</option>
+            <option value="B">Línea B · INJ-07 a INJ-12</option>
+            <option value="C">Línea C · INJ-13 a INJ-17</option>
+            <option value="D">Línea D · INJ-18 a INJ-22</option>
+          </select>
+        </div>
+
+        <div class="button-group">
+          <button type="button" id="btn-toggle-stream" class="btn btn-primary" onclick="toggleTelemetryStream()">
+            <i data-lucide="pause" aria-hidden="true"></i>
+            <span id="btn-toggle-label">Pausar telemetría</span>
+          </button>
+          <button type="button" class="btn btn-danger" onclick="injectContainmentFault()">
+            <i data-lucide="shield-alert" aria-hidden="true"></i>
+            <span>Simular alerta FAIL</span>
+          </button>
+          <button type="button" class="btn btn-secondary" onclick="resetActiveFilters()">
+            <i data-lucide="rotate-ccw" aria-hidden="true"></i>
+            <span>Restablecer filtros</span>
+          </button>
+        </div>
+      </div>
+
+      <div id="system-banner" class="status-banner is-healthy" role="status" aria-live="polite">
+        <div class="banner-main">
+          <i id="banner-icon" data-lucide="check-circle-2" aria-hidden="true"></i>
+          <span id="banner-text">Cadena Edge-to-Cloud estable: latencia de validación de gates bajo umbral SLA de 100 ms y sincronización MQTT al día.</span>
+        </div>
+        <span id="banner-meta" class="banner-meta">Ciclo de muestreo: 1.5 s</span>
+      </div>
+    </header>
+
+    <!-- 5 KPIs Principales -->
+    <section class="kpi-grid" aria-label="Indicadores clave de rendimiento en tiempo real">
+      <article id="kpi-edge-card" class="kpi-tile">
+        <div class="kpi-top">
+          <span class="data-label">Latencia Gates Edge (p95)</span>
+          <span id="kpi-edge-chip" class="status-chip chip-sage">SLA OK</span>
+        </div>
+        <div id="kpi-edge-val" class="metric-value">41.8 ms</div>
+        <div class="sla-track" aria-hidden="true">
+          <div id="kpi-edge-bar" class="sla-fill" style="width: 42%;"></div>
+        </div>
+        <div id="kpi-edge-sub" class="metric-delta">Umbral &lt; 100 ms · p50: 26.4 ms</div>
+      </article>
+
+      <article id="kpi-mqtt-card" class="kpi-tile">
+        <div class="kpi-top">
+          <span class="data-label">Mosquitto MQTT Broker</span>
+          <span id="kpi-mqtt-chip" class="status-chip chip-cyan">QoS 1</span>
+        </div>
+        <div id="kpi-mqtt-val" class="metric-value">1,420 msg/s</div>
+        <div id="kpi-mqtt-sub" class="metric-sub">22/22 ESP conectados · Cola: 0</div>
+        <div id="kpi-mqtt-delta" class="metric-delta">Descartes: 0.00% · PubACK 4.2 ms</div>
+      </article>
+
+      <article id="kpi-sqlite-card" class="kpi-tile">
+        <div class="kpi-top">
+          <span class="data-label">Buffer SQLite Offline</span>
+          <span id="kpi-sqlite-chip" class="status-chip chip-sage">SINCRONIZADO</span>
+        </div>
+        <div id="kpi-sqlite-val" class="metric-value">0 reg.</div>
+        <div id="kpi-sqlite-sub" class="metric-sub">Modo WAL · Uso disco: 12.4 MB</div>
+        <div id="kpi-sqlite-delta" class="metric-delta">Drenado: 0 reg/s · Integridad OK</div>
+      </article>
+
+      <article id="kpi-esp-card" class="kpi-tile">
+        <div class="kpi-top">
+          <span class="data-label">Salud Terminales ESP</span>
+          <span id="kpi-esp-chip" class="status-chip chip-sage">22 / 22</span>
+        </div>
+        <div id="kpi-esp-val" class="metric-value">100.0%</div>
+        <div id="kpi-esp-sub" class="metric-sub">RSSI promedio: -54 dBm · Heap 68%</div>
+        <div id="kpi-esp-delta" class="metric-delta">0 reconexiones en última hora</div>
+      </article>
+
+      <article id="kpi-quality-card" class="kpi-tile">
+        <div class="kpi-top">
+          <span class="data-label">Contención Gates (CP 01–16)</span>
+          <span id="kpi-quality-chip" class="status-chip chip-sage">CONTROLADO</span>
+        </div>
+        <div id="kpi-quality-val" class="metric-value">98.8% PASS</div>
+        <div id="kpi-quality-sub" class="metric-sub">Eventos totales: 18,420</div>
+        <div id="kpi-quality-delta" class="metric-delta">Contenciones activas: 1 FAIL</div>
+      </article>
+    </section>
+
+    <!-- Sección Central: Series de Latencia/MQTT + Stack de Infraestructura -->
+    <section class="telemetry-split" aria-label="Tendencias en tiempo real e infraestructura Backend">
+      <div class="panel">
+        <div class="panel-header">
+          <div>
+            <h2 class="section-title">Latencia Edge (&lt; 100 ms), Tráfico MQTT y Buffer SQLite</h2>
+            <span class="panel-caption">Ventana deslizante · últimas 24 muestras</span>
+          </div>
+        </div>
+
+        <div class="charts-stack">
+          <div class="chart-card">
+            <div class="chart-head">
+              <h3 class="chart-title">Latencia de validación de gates en Edge (ms)</h3>
+              <div class="legend-inline">
+                <span class="legend-item"><span class="swatch swatch-cyan"></span>p95 Edge (ms)</span>
+                <span class="legend-item"><span class="swatch swatch-sage"></span>p50 Edge (ms)</span>
+                <span class="legend-item"><span class="swatch swatch-coral"></span>Umbral SLA 100 ms</span>
+              </div>
+            </div>
+            <div class="chart-box">
+              <canvas id="chart-edge-latency" aria-label="Gráfico temporal de latencia de validación Edge"></canvas>
+            </div>
+          </div>
+
+          <div class="chart-card">
+            <div class="chart-head">
+              <h3 class="chart-title">Mensajes Mosquitto MQTT (msg/s) y Cola SQLite Offline (reg.)</h3>
+              <div class="legend-inline">
+                <span class="legend-item"><span class="swatch swatch-cyan"></span>Throughput MQTT (msg/s)</span>
+                <span class="legend-item"><span class="swatch swatch-amber"></span>Registros en buffer SQLite</span>
+              </div>
+            </div>
+            <div class="chart-box">
+              <canvas id="chart-mqtt-sqlite" aria-label="Gráfico de flujo MQTT y cola SQLite offline"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <aside class="panel" aria-label="Estado de servicios de infraestructura Backend y Edge">
+        <div class="panel-header">
+          <div>
+            <h2 class="section-title">Infraestructura Backend &amp; Edge</h2>
+            <span class="panel-caption">Selecciona un componente para inspeccionar</span>
+          </div>
+        </div>
+
+        <div id="infra-nodes-list" class="pipeline-flow" role="list">
+          <!-- Renderizado dinámico por JS -->
+        </div>
+
+        <div id="infra-detail-box" class="infra-detail-box" aria-live="polite">
+          <!-- Detalle técnico del servicio seleccionado -->
+        </div>
+      </aside>
+    </section>
+
+    <!-- Salud de Terminales ESP en las 22 Máquinas de Inyección -->
+    <section class="panel" aria-label="Salud de las 22 máquinas de inyección y terminales ESP">
+      <div class="panel-header">
+        <div>
+          <h2 class="section-title">Flota de 22 Máquinas de Inyección — Terminales ESP</h2>
+          <span class="panel-caption" id="fleet-caption">Mostrando 22 máquinas · Haz clic en una máquina para inspeccionar y filtrar</span>
+        </div>
+        <div class="legend-inline">
+          <span class="legend-item"><span class="status-dot dot-ok"></span>En línea (OK)</span>
+          <span class="legend-item"><span class="status-dot dot-warn"></span>Buffering SQLite / Degradada</span>
+          <span class="legend-item"><span class="status-dot dot-err"></span>Contención FAIL activa</span>
+        </div>
+      </div>
+
+      <div class="fleet-layout">
+        <div id="machines-grid" class="machines-grid" role="list">
+          <!-- 22 tarjetas de máquinas INJ-01 a INJ-22 -->
+        </div>
+
+        <div id="machine-inspector" class="inspector-well" aria-live="polite">
+          <!-- Inspector de la máquina seleccionada -->
+        </div>
+      </div>
+    </section>
+
+    <!-- Los 16 Checkpoints (CP 01 a CP 16) -->
+    <section class="panel" aria-label="Monitoreo de los 16 Checkpoints de trazabilidad">
+      <div class="panel-header">
+        <div>
+          <h2 class="section-title">Matriz de los 16 Checkpoints (CP 01 a CP 16)</h2>
+          <span class="panel-caption" id="cp-caption">Validación de flujo de inyección a liberación · Clic para filtrar tabla de eventos</span>
+        </div>
+        <button type="button" id="btn-clear-cp" class="btn btn-secondary btn-sm" onclick="selectCheckpoint(null)" style="display: none;">
+          Mostrar los 16 Checkpoints
+        </button>
+      </div>
+
+      <div id="cp-grid" class="cp-grid">
+        <!-- 16 Checkpoints CP 01..CP 16 -->
+      </div>
+    </section>
+
+    <!-- Consola de Alertas de Contención (FAIL/PASS) y Bitácora -->
+    <section class="panel" aria-label="Bitácora de eventos y alertas de contención">
+      <div class="panel-header">
+        <div>
+          <h2 class="section-title">Eventos de Checkpoints y Alertas de Contención (PASS / FAIL)</h2>
+          <span class="panel-caption" id="events-summary-caption">Eventos en tiempo real con trazabilidad por lote, máquina y origen de sincronización</span>
+        </div>
+      </div>
+
+      <div class="events-toolbar">
+        <div class="segmented-group" role="group" aria-label="Filtrar resultado de checkpoint">
+          <button type="button" id="filter-res-ALL" class="seg-btn is-active" onclick="setResultFilter('ALL')">Todos</button>
+          <button type="button" id="filter-res-FAIL" class="seg-btn" onclick="setResultFilter('FAIL')">Alertas Contención (FAIL)</button>
+          <button type="button" id="filter-res-PASS" class="seg-btn" onclick="setResultFilter('PASS')">Aprobados (PASS)</button>
+        </div>
+
+        <div class="control-field compact">
+          <label class="field-label" for="event-search">Buscar lote, pieza o máquina</label>
+          <input id="event-search" class="well-input" type="search" placeholder="Ej. LOT-2611, INJ-08, CP 08" oninput="setSearchQuery(this.value)">
+        </div>
+      </div>
+
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Hora</th>
+              <th>Máquina / ESP</th>
+              <th>Checkpoint</th>
+              <th>Lote / Pieza</th>
+              <th style="text-align: right;">Latencia Edge</th>
+              <th>Origen</th>
+              <th>Resultado</th>
+              <th>Estado Contención / Acción</th>
+            </tr>
+          </thead>
+          <tbody id="events-tbody">
+            <!-- Filas de eventos generadas dinámicamente -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <footer class="footer-note">
+      <span>Sistema de Trazabilidad y Control de Producción en Líneas de Inyección de Plástico · Arquitectura Edge (ESP + SQLite) → Mosquitto MQTT → FastAPI + Redis + MySQL.</span>
+      <span id="footer-stats" class="mono-cell">Muestras procesadas: 0</span>
+    </footer>
+  </main>
+
+  <script>
+    /* ============================================================
+       MODELO DE DATOS Y CONFIGURACIÓN DEL SISTEMA DE TRAZABILIDAD
+       ============================================================ */
+    const CHECKPOINTS_CATALOG = [
+      { id: `CP 01`, name: `Dosificación y secado de resina`, targetMs: 28 },
+      { id: `CP 02`, name: `Carga de molde y verificación RFID`, targetMs: 36 },
+      { id: `CP 03`, name: `Parámetros cierre y temp. barril`, targetMs: 32 },
+      { id: `CP 04`, name: `Inyección y presión sostenimiento`, targetMs: 24 },
+      { id: `CP 05`, name: `Enfriamiento y tiempo de ciclo`, targetMs: 22 },
+      { id: `CP 06`, name: `Desmoldeo y retiro robótico`, targetMs: 29 },
+      { id: `CP 07`, name: `Corte de colada y desbaste`, targetMs: 34 },
+      { id: `CP 08`, name: `Control dimensional crítico`, targetMs: 48 },
+      { id: `CP 09`, name: `Verificación de peso de pieza`, targetMs: 31 },
+      { id: `CP 10`, name: `Inspección visual de defectos`, targetMs: 52 },
+      { id: `CP 11`, name: `Prueba de hermeticidad`, targetMs: 45 },
+      { id: `CP 12`, name: `Ensamble de inserto metálico`, targetMs: 39 },
+      { id: `CP 13`, name: `Grabado láser y lectura QR`, targetMs: 44 },
+      { id: `CP 14`, name: `Validación gate lote-pieza`, targetMs: 38 },
+      { id: `CP 15`, name: `Empaque y etiquetado de caja`, targetMs: 35 },
+      { id: `CP 16`, name: `Liberación final a embarque`, targetMs: 41 }
+    ];
+
+    const FAIL_REASONS = [
+      `Fuera de tolerancia dimensional (+0.18 mm)`,
+      `Presión de sostenimiento por debajo del mínimo`,
+      `Lectura QR duplicada o ilegible en gate`,
+      `Peso fuera de banda nominal (-2.4 g)`,
+      `Microfisura / rechupe detectado por cámara`,
+      `Falla en prueba de hermeticidad (-14 mbar)`,
+      `Secuencia de checkpoint previo incompleta`
+    ];
+
+    const LINE_MAP = function(index) {
+      if (index <= 6) return `A`;
+      if (index <= 12) return `B`;
+      if (index <= 17) return `C`;
+      return `D`;
+    };
+
+    const MOLDS = [
+      `MLD-TAPA-402`, `MLD-CARCASA-118`, `MLD-CONECTOR-88`, `MLD-DUCTO-310`,
+      `MLD-VALVULA-55`, `MLD-SOPORTE-204`
+    ];
+
+    const state = {
+      running: true,
+      scenario: `nominal`,
+      lineFilter: `ALL`,
+      selectedMachineId: `INJ-01`,
+      filterBySelectedMachine: false,
+      selectedCheckpointId: null,
+      selectedInfraId: `mosquitto`,
+      resultFilter: `ALL`,
+      searchQuery: ``,
+      tickCount: 0,
+      totalEvents: 18420,
+      totalPass: 18198,
+      totalFail: 222,
+      sqliteQueue: 0,
+      sqliteDrainRate: 0,
+      sqliteDiskMb: 12.4,
+      mqttRate: 1420,
+      mqttInFlight: 14,
+      mqttDropped: 0,
+      edgeP50: 26.4,
+      edgeP95: 41.8,
+      machines: [],
+      checkpoints: [],
+      events: [],
+      historyLabels: [],
+      historyEdgeP95: [],
+      historyEdgeP50: [],
+      historyMqtt: [],
+      historySqlite: [],
+      infra: {
+        mosquitto: {
+          id: `mosquitto`,
+          name: `Mosquitto MQTT Broker`,
+          role: `Ingesta Pub/Sub QoS 1 · TLS 1.3`,
+          status: `ONLINE`,
+          latencyMs: 4.2,
+          rateLabel: `1,420 msg/s`,
+          metrics: {
+            'Clientes activos': `22 ESP + 8 Workers`,
+            'Mensajes en vuelo': `14`,
+            'Paquetes descartados': `0`,
+            'Memoria heap': `184 / 512 MB`,
+            'Tópicos activos': `112 (planta/+/cp/+)`,
+            'Uptime broker': `48d 14h 22m`
+          }
+        },
+        sqlite: {
+          id: `sqlite`,
+          name: `Edge SQLite Offline Buffer`,
+          role: `Cola local resiliente en estaciones Edge (WAL)`,
+          status: `ONLINE`,
+          latencyMs: 1.9,
+          rateLabel: `0 reg. pendientes`,
+          metrics: {
+            'Registros en cola': `0`,
+            'Tasa de drenado': `0 reg/s`,
+            'Modo de journal': `WAL + synchronous=NORMAL`,
+            'Tamaño archivo DB': `12.4 MB`,
+            'Integridad PRAGMA': `OK (0 páginas corruptas)`,
+            'Última sincronización': `Hace 1 s`
+          }
+        },
+        fastapi: {
+          id: `fastapi`,
+          name: `FastAPI (Core Trazabilidad)`,
+          role: `Validación de reglas, API REST & Suscriptor MQTT`,
+          status: `ONLINE`,
+          latencyMs: 18.4,
+          rateLabel: `610 req/s`,
+          metrics: {
+            'Workers Uvicorn': `8 / 8 activos`,
+            'Latencia API p95': `18.4 ms`,
+            'Errores HTTP 5xx': `0.00%`,
+            'Uso CPU contenedor': `31.2%`,
+            'Memoria RSS': `642 MB`,
+            'Cola asíncrona': `3 tareas`
+          }
+        },
+        redis: {
+          id: `redis`,
+          name: `Redis (Estado Gates & Caché)`,
+          role: `Caché de lotes activos y estado de última estación`,
+          status: `ONLINE`,
+          latencyMs: 0.4,
+          rateLabel: `9,840 ops/s`,
+          metrics: {
+            'Cache Hit Ratio': `99.3%`,
+            'Latencia comandos': `0.4 ms`,
+            'Memoria usada': `412 / 1024 MB`,
+            'Claves activas': `48,920`,
+            'Evicciones': `0`,
+            'Persistencia AOF': `Habilitada (1 s)`
+          }
+        },
+        mysql: {
+          id: `mysql`,
+          name: `MySQL 8.0 (Persistencia)`,
+          role: `Registro maestro de trazabilidad, lotes y contención`,
+          status: `ONLINE`,
+          latencyMs: 6.2,
+          rateLabel: `1,380 writes/s`,
+          metrics: {
+            'Pool de conexiones': `34 / 100 activas`,
+            'Latencia escritura p95': `6.2 ms`,
+            'InnoDB Buffer Hit': `99.7%`,
+            'Deadlocks / min': `0`,
+            'Lag de réplica': `0 ms`,
+            'Espacio disponible': `68% libre (1.4 TB)`
+          }
+        }
+      }
+    };
+
+    let chartEdge = null;
+    let chartMqtt = null;
+    let streamTimer = null;
+
+    function cssVar(name) {
+      return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    }
+
+    function pad2(n) {
+      return n < 10 ? `0${n}` : `${n}`;
+    }
+
+    function formatTime(date) {
+      return `${pad2(date.getHours())}:${pad2(date.getMinutes())}:${pad2(date.getSeconds())}`;
+    }
+
+    function randRange(min, max) {
+      return min + Math.random() * (max - min);
+    }
+
+    function randInt(min, max) {
+      return Math.floor(randRange(min, max + 1));
+    }
+
+    /* Inicialización de las 22 máquinas, 16 checkpoints e historial */
+    function initData() {
+      state.machines = [];
+      for (let i = 1; i <= 22; i++) {
+        const num = pad2(i);
+        const line = LINE_MAP(i);
+        const cpIdx = (i * 3) % 16;
+        state.machines.push({
+          id: `INJ-${num}`,
+          espId: `ESP32-S3-${num}`,
+          line: line,
+          mold: MOLDS[(i - 1) % MOLDS.length],
+          status: i === 8 ? `FAIL` : `OK`,
+          edgeLatencyMs: Number(randRange(24, 48).toFixed(1)),
+          rssiDbm: -randInt(46, 62),
+          sqliteBuffer: 0,
+          cyclesToday: randInt(1180, 2450),
+          lastCp: CHECKPOINTS_CATALOG[cpIdx].id,
+          heapFreePct: randInt(61, 76),
+          lot: `LOT-2611-${line}${num}`,
+          failCount: i === 8 ? 1 : 0
+        });
+      }
+
+      state.checkpoints = CHECKPOINTS_CATALOG.map(function(cp, idx) {
+        const basePass = randInt(980, 1340);
+        const baseFail = idx === 7 || idx === 9 ? randInt(14, 24) : randInt(2, 11);
+        return {
+          id: cp.id,
+          name: cp.name,
+          passCount: basePass,
+          failCount: baseFail,
+          avgLatencyMs: Number((cp.targetMs + randRange(-4, 7)).toFixed(1)),
+          activeContainment: idx === 7 ? 1 : 0
+        };
+      });
+
+      const now = Date.now();
+      for (let t = 23; t >= 0; t--) {
+        const d = new Date(now - t * 1500);
+        state.historyLabels.push(formatTime(d));
+        state.historyEdgeP95.push(Number(randRange(37, 46).toFixed(1)));
+        state.historyEdgeP50.push(Number(randRange(22, 29).toFixed(1)));
+        state.historyMqtt.push(randInt(1350, 1490));
+        state.historySqlite.push(0);
+      }
+
+      // Eventos iniciales incluyendo una contención FAIL activa en INJ-08 / CP 08
+      const seedEvents = [
+        {
+          id: `EVT-1005`,
+          time: formatTime(new Date(now - 3000)),
+          machineId: `INJ-08`,
+          espId: `ESP32-S3-08`,
+          line: `B`,
+          cpId: `CP 08`,
+          lot: `LOT-2611-B08`,
+          partCode: `PZA-88412`,
+          latencyMs: 46.2,
+          origin: `MQTT Directo`,
+          result: `FAIL`,
+          reason: `Fuera de tolerancia dimensional (+0.18 mm)`,
+          containmentStatus: `ACTIVA`
+        },
+        {
+          id: `EVT-1004`,
+          time: formatTime(new Date(now - 6000)),
+          machineId: `INJ-14`,
+          espId: `ESP32-S3-14`,
+          line: `C`,
+          cpId: `CP 13`,
+          lot: `LOT-2611-C14`,
+          partCode: `PZA-88411`,
+          latencyMs: 39.8,
+          origin: `MQTT Directo`,
+          result: `PASS`,
+          reason: `Validación gate correcta`,
+          containmentStatus: `LIBERADA`
+        },
+        {
+          id: `EVT-1003`,
+          time: formatTime(new Date(now - 9000)),
+          machineId: `INJ-03`,
+          espId: `ESP32-S3-03`,
+          line: `A`,
+          cpId: `CP 04`,
+          lot: `LOT-2611-A03`,
+          partCode: `PZA-88410`,
+          latencyMs: 28.4,
+          origin: `MQTT Directo`,
+          result: `PASS`,
+          reason: `Presión dentro de ventana nominal`,
+          containmentStatus: `LIBERADA`
+        },
+        {
+          id: `EVT-1002`,
+          time: formatTime(new Date(now - 12000)),
+          machineId: `INJ-19`,
+          espId: `ESP32-S3-19`,
+          line: `D`,
+          cpId: `CP 16`,
+          lot: `LOT-2611-D19`,
+          partCode: `PZA-88409`,
+          latencyMs: 41.1,
+          origin: `MQTT Directo`,
+          result: `PASS`,
+          reason: `Embarque autorizado en gate final`,
+          containmentStatus: `LIBERADA`
+        },
+        {
+          id: `EVT-1001`,
+          time: formatTime(new Date(now - 15000)),
+          machineId: `INJ-10`,
+          espId: `ESP32-S3-10`,
+          line: `B`,
+          cpId: `CP 10`,
+          lot: `LOT-2611-B10`,
+          partCode: `PZA-88408`,
+          latencyMs: 49.5,
+          origin: `MQTT Directo`,
+          result: `FAIL`,
+          reason: `Microfisura / rechupe detectado por cámara`,
+          containmentStatus: `CUARENTENA`
+        }
+      ];
+      state.events = seedEvents;
+    }
+
+    /* ============================================================
+       GRÁFICOS CHART.JS
+       ============================================================ */
+    function initCharts() {
+      const cyan = cssVar(`--data-1`);
+      const sage = cssVar(`--data-2`);
+      const amber = cssVar(`--data-3`);
+      const coral = cssVar(`--data-4`);
+      const textMuted = cssVar(`--on-surface-variant`);
+      const gridColor = cssVar(`--outline-variant`);
+      const surfaceTooltip = cssVar(`--surface-container-high`);
+      const textMain = cssVar(`--on-surface`);
+      const monoFont = cssVar(`--font-label`);
+
+      const ctxEdge = document.getElementById(`chart-edge-latency`);
+      if (ctxEdge) {
+        chartEdge = new Chart(ctxEdge, {
+          type: `line`,
+          data: {
+            labels: state.historyLabels.slice(),
+            datasets: [
+              {
+                label: `p95 Edge (ms)`,
+                data: state.historyEdgeP95.slice(),
+                borderColor: cyan,
+                backgroundColor: `rgba(99, 199, 214, 0.12)`,
+                borderWidth: 2,
+                tension: 0.3,
+                fill: true,
+                pointRadius: 0,
+                pointHoverRadius: 4
+              },
+              {
+                label: `p50 Edge (ms)`,
+                data: state.historyEdgeP50.slice(),
+                borderColor: sage,
+                borderWidth: 2,
+                tension: 0.3,
+                fill: false,
+                pointRadius: 0,
+                pointHoverRadius: 4
+              },
+              {
+                label: `Umbral SLA (100 ms)`,
+                data: state.historyLabels.map(function() { return 100; }),
+                borderColor: coral,
+                borderWidth: 1.5,
+                borderDash: [6, 5],
+                fill: false,
+                pointRadius: 0
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: false,
+            interaction: { mode: `index`, intersect: false },
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                backgroundColor: surfaceTooltip,
+                titleColor: textMain,
+                bodyColor: textMain,
+                borderColor: gridColor,
+                borderWidth: 1
+              }
+            },
+            scales: {
+              x: {
+                ticks: {
+                  color: textMuted,
+                  font: { family: monoFont, size: 10 },
+                  maxTicksLimit: 6
+                },
+                grid: { display: false }
+              },
+              y: {
+                min: 0,
+                suggestedMax: 120,
+                ticks: {
+                  color: textMuted,
+                  font: { family: monoFont, size: 10 },
+                  callback: function(v) { return `${v} ms`; }
+                },
+                grid: { color: gridColor }
+              }
+            }
+          }
+        });
+      }
+
+      const ctxMqtt = document.getElementById(`chart-mqtt-sqlite`);
+      if (ctxMqtt) {
+        chartMqtt = new Chart(ctxMqtt, {
+          type: `line`,
+          data: {
+            labels: state.historyLabels.slice(),
+            datasets: [
+              {
+                label: `Throughput MQTT (msg/s)`,
+                data: state.historyMqtt.slice(),
+                borderColor: cyan,
+                backgroundColor: `rgba(99, 199, 214, 0.12)`,
+                borderWidth: 2,
+                tension: 0.25,
+                fill: true,
+                pointRadius: 0,
+                yAxisID: `y`
+              },
+              {
+                label: `Buffer SQLite Offline (reg.)`,
+                data: state.historySqlite.slice(),
+                borderColor: amber,
+                backgroundColor: `rgba(232, 185, 84, 0.22)`,
+                borderWidth: 2,
+                tension: 0.2,
+                fill: true,
+                pointRadius: 0,
+                yAxisID: `y1`
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: false,
+            interaction: { mode: `index`, intersect: false },
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                backgroundColor: surfaceTooltip,
+                titleColor: textMain,
+                bodyColor: textMain,
+                borderColor: gridColor,
+                borderWidth: 1
+              }
+            },
+            scales: {
+              x: {
+                ticks: {
+                  color: textMuted,
+                  font: { family: monoFont, size: 10 },
+                  maxTicksLimit: 6
+                },
+                grid: { display: false }
+              },
+              y: {
+                position: `left`,
+                min: 0,
+                suggestedMax: 2600,
+                ticks: {
+                  color: textMuted,
+                  font: { family: monoFont, size: 10 },
+                  callback: function(v) { return `${v}`; }
+                },
+                grid: { color: gridColor }
+              },
+              y1: {
+                position: `right`,
+                min: 0,
+                suggestedMax: 400,
+                ticks: {
+                  color: amber,
+                  font: { family: monoFont, size: 10 },
+                  callback: function(v) { return `${v} reg`; }
+                },
+                grid: { drawOnChartArea: false }
+              }
+            }
+          }
+        });
+      }
+    }
+
+    function updateCharts() {
+      if (chartEdge) {
+        chartEdge.data.labels = state.historyLabels.slice();
+        chartEdge.data.datasets[0].data = state.historyEdgeP95.slice();
+        chartEdge.data.datasets[1].data = state.historyEdgeP50.slice();
+        chartEdge.data.datasets[2].data = state.historyLabels.map(function() { return 100; });
+        chartEdge.update(`none`);
+      }
+      if (chartMqtt) {
+        chartMqtt.data.labels = state.historyLabels.slice();
+        chartMqtt.data.datasets[0].data = state.historyMqtt.slice();
+        chartMqtt.data.datasets[1].data = state.historySqlite.slice();
+        chartMqtt.update(`none`);
+      }
+    }
+
+    /* ============================================================
+       SIMULACIÓN DE TELEMETRÍA EN TIEMPO REAL
+       ============================================================ */
+    function stepTelemetry() {
+      state.tickCount += 1;
+      const now = new Date();
+      const timeStr = formatTime(now);
+
+      const scen = state.scenario;
+
+      // 1. Calcular latencia Edge, MQTT y buffer SQLite según escenario
+      let targetP95 = randRange(36, 49);
+      let targetP50 = randRange(22, 31);
+      let targetMqtt = randInt(1340, 1520);
+      let failProb = 0.04;
+
+      if (scen === `mqtt_burst`) {
+        targetP95 = randRange(64, 89);
+        targetP50 = randRange(39, 54);
+        targetMqtt = randInt(2350, 2980);
+        state.mqttInFlight = randInt(48, 120);
+        failProb = 0.06;
+      } else if (scen === `offline_buffer`) {
+        targetP95 = randRange(44, 62);
+        targetP50 = randRange(26, 37);
+        targetMqtt = randInt(180, 420);
+        state.sqliteQueue = Math.min(2800, state.sqliteQueue + randInt(55, 95));
+        state.sqliteDrainRate = 0;
+        state.sqliteDiskMb = Number((12.4 + state.sqliteQueue * 0.008).toFixed(1));
+        state.mqttInFlight = randInt(2, 12);
+        failProb = 0.05;
+      } else if (scen === `containment_spike`) {
+        targetP95 = randRange(52, 74);
+        targetP50 = randRange(31, 44);
+        targetMqtt = randInt(1480, 1790);
+        state.mqttInFlight = randInt(18, 36);
+        failProb = 0.28;
+      } else {
+        // Nominal: drenar buffer SQLite si quedó algo pendiente
+        if (state.sqliteQueue > 0) {
+          const drained = Math.min(state.sqliteQueue, randInt(95, 160));
+          state.sqliteQueue -= drained;
+          state.sqliteDrainRate = drained;
+          state.sqliteDiskMb = Number((12.4 + state.sqliteQueue * 0.008).toFixed(1));
+        } else {
+          state.sqliteDrainRate = 0;
+          state.sqliteDiskMb = 12.4;
+        }
+        state.mqttInFlight = randInt(8, 22);
+      }
+
+      state.edgeP95 = Number(targetP95.toFixed(1));
+      state.edgeP50 = Number(targetP50.toFixed(1));
+      state.mqttRate = targetMqtt;
+
+      // Actualizar historial de gráficos
+      state.historyLabels.push(timeStr);
+      state.historyEdgeP95.push(state.edgeP95);
+      state.historyEdgeP50.push(state.edgeP50);
+      state.historyMqtt.push(state.mqttRate);
+      state.historySqlite.push(state.sqliteQueue);
+
+      if (state.historyLabels.length > 24) {
+        state.historyLabels.shift();
+        state.historyEdgeP95.shift();
+        state.historyEdgeP50.shift();
+        state.historyMqtt.shift();
+        state.historySqlite.shift();
+      }
+
+      // 2. Actualizar estado de las 22 máquinas
+      state.machines.forEach(function(m, idx) {
+        if (scen === `offline_buffer` && idx % 2 === 0) {
+          m.status = `BUFFER`;
+          m.sqliteBuffer = Math.min(260, m.sqliteBuffer + randInt(4, 11));
+          m.edgeLatencyMs = Number(randRange(34, 61).toFixed(1));
+        } else {
+          if (m.sqliteBuffer > 0) {
+            m.sqliteBuffer = Math.max(0, m.sqliteBuffer - randInt(8, 16));
+          }
+          m.edgeLatencyMs = Number((targetP50 + randRange(-6, 18)).toFixed(1));
+          if (m.failCount > 0) {
+            m.status = `FAIL`;
+          } else if (m.sqliteBuffer > 0) {
+            m.status = `BUFFER`;
+          } else {
+            m.status = `OK`;
+          }
+        }
+        m.rssiDbm = -randInt(45, scen === `offline_buffer` ? 74 : 62);
+        if (state.tickCount % 2 === 0) {
+          m.cyclesToday += randInt(1, 3);
+        }
+      });
+
+      // 3. Generar 1 o 2 eventos de checkpoint en el tick
+      const eventsToGenerate = scen === `mqtt_burst` ? 2 : 1;
+      for (let e = 0; e < eventsToGenerate; e++) {
+        const m = state.machines[randInt(0, state.machines.length - 1)];
+        const cpIdx = randInt(0, CHECKPOINTS_CATALOG.length - 1);
+        const cp = state.checkpoints[cpIdx];
+        const isFail = Math.random() < failProb;
+        const lat = Number((cp.avgLatencyMs + randRange(-5, scen === `mqtt_burst` ? 34 : 14)).toFixed(1));
+        const fromSqlite = state.sqliteDrainRate > 0 && Math.random() < 0.45;
+
+        m.lastCp = cp.id;
+        state.totalEvents += 1;
+
+        if (isFail) {
+          state.totalFail += 1;
+          cp.failCount += 1;
+          cp.activeContainment += 1;
+          m.failCount += 1;
+          m.status = `FAIL`;
+        } else {
+          state.totalPass += 1;
+          cp.passCount += 1;
+        }
+        cp.avgLatencyMs = Number((cp.avgLatencyMs * 0.8 + lat * 0.2).toFixed(1));
+
+        const newEvt = {
+          id: `EVT-${1006 + state.tickCount * 2 + e}`,
+          time: timeStr,
+          machineId: m.id,
+          espId: m.espId,
+          line: m.line,
+          cpId: cp.id,
+          lot: m.lot,
+          partCode: `PZA-${randInt(88420, 89999)}`,
+          latencyMs: lat,
+          origin: fromSqlite ? `Sync SQLite` : (scen === `offline_buffer` ? `Buffer Local SQLite` : `MQTT Directo`),
+          result: isFail ? `FAIL` : `PASS`,
+          reason: isFail ? FAIL_REASONS[randInt(0, FAIL_REASONS.length - 1)] : `Validación gate dentro de parámetros`,
+          containmentStatus: isFail ? `ACTIVA` : `LIBERADA`
+        };
+
+        state.events.unshift(newEvt);
+      }
+
+      if (state.events.length > 60) {
+        state.events.length = 60;
+      }
+
+      // 4. Actualizar métricas de infraestructura Backend
+      updateInfraMetrics(scen);
+
+      // 5. Re-renderizar todo
+      renderAll();
+    }
+
+    function updateInfraMetrics(scen) {
+      const onlineEsp = state.machines.filter(function(m) { return m.status !== `BUFFER`; }).length;
+      const fastapiRps = scen === `mqtt_burst` ? randInt(1180, 1450) : (scen === `offline_buffer` ? randInt(140, 260) : randInt(580, 680));
+      const fastapiLat = scen === `mqtt_burst` ? randRange(34, 49).toFixed(1) : randRange(15, 22).toFixed(1);
+      const mysqlWrites = scen === `offline_buffer` ? randInt(190, 340) : (scen === `mqtt_burst` ? randInt(2100, 2650) : randInt(1320, 1490));
+      const mysqlLat = scen === `mqtt_burst` ? randRange(11, 17).toFixed(1) : randRange(5, 8).toFixed(1);
+
+      state.infra.mosquitto.status = scen === `offline_buffer` ? `DEGRADADO` : `ONLINE`;
+      state.infra.mosquitto.latencyMs = scen === `mqtt_burst` ? Number(randRange(8.5, 14.2).toFixed(1)) : Number(randRange(3.2, 5.1).toFixed(1));
+      state.infra.mosquitto.rateLabel = `${state.mqttRate.toLocaleString(`es-ES`)} msg/s`;
+      state.infra.mosquitto.metrics[`Clientes activos`] = `${onlineEsp} ESP + 8 Workers`;
+      state.infra.mosquitto.metrics[`Mensajes en vuelo`] = `${state.mqttInFlight}`;
+      state.infra.mosquitto.metrics[`Memoria heap`] = `${scen === `mqtt_burst` ? 312 : 184} / 512 MB`;
+
+      state.infra.sqlite.status = state.sqliteQueue > 0 ? `BUFFERING` : `ONLINE`;
+      state.infra.sqlite.rateLabel = `${state.sqliteQueue} reg. pendientes`;
+      state.infra.sqlite.metrics[`Registros en cola`] = `${state.sqliteQueue}`;
+      state.infra.sqlite.metrics[`Tasa de drenado`] = `${state.sqliteDrainRate} reg/s`;
+      state.infra.sqlite.metrics[`Tamaño archivo DB`] = `${state.sqliteDiskMb} MB`;
+      state.infra.sqlite.metrics[`Última sincronización`] = scen === `offline_buffer` ? `En espera de enlace` : `Hace 1 s`;
+
+      state.infra.fastapi.status = scen === `mqtt_burst` ? `CARGA ALTA` : `ONLINE`;
+      state.infra.fastapi.latencyMs = Number(fastapiLat);
+      state.infra.fastapi.rateLabel = `${fastapiRps} req/s`;
+      state.infra.fastapi.metrics[`Latencia API p95`] = `${fastapiLat} ms`;
+      state.infra.fastapi.metrics[`Uso CPU contenedor`] = `${scen === `mqtt_burst` ? randInt(64, 78) : randInt(28, 38)}%`;
+
+      state.infra.redis.status = `ONLINE`;
+      state.infra.redis.latencyMs = Number(randRange(0.3, 0.7).toFixed(1));
+      state.infra.redis.rateLabel = `${(fastapiRps * 14).toLocaleString(`es-ES`)} ops/s`;
+      state.infra.redis.metrics[`Cache Hit Ratio`] = `${scen === `containment_spike` ? `98.8%` : `99.3%`}`;
+
+      state.infra.mysql.status = scen === `mqtt_burst` ? `CARGA ALTA` : `ONLINE`;
+      state.infra.mysql.latencyMs = Number(mysqlLat);
+      state.infra.mysql.rateLabel = `${mysqlWrites.toLocaleString(`es-ES`)} writes/s`;
+      state.infra.mysql.metrics[`Pool de conexiones`] = `${scen === `mqtt_burst` ? randInt(62, 84) : randInt(30, 42)} / 100 activas`;
+      state.infra.mysql.metrics[`Latencia escritura p95`] = `${mysqlLat} ms`;
+    }
+
+    /* ============================================================
+       RENDERIZADO DE LA INTERFAZ
+       ============================================================ */
+    function renderAll() {
+      const clockEl = document.getElementById(`clock-readout`);
+      if (clockEl) {
+        clockEl.textContent = formatTime(new Date());
+      }
+
+      renderBanner();
+      renderKpis();
+      updateCharts();
+      renderInfra();
+      renderMachines();
+      renderCheckpoints();
+      renderEventsTable();
+
+      const footerStats = document.getElementById(`footer-stats`);
+      if (footerStats) {
+        footerStats.textContent = `Muestras procesadas: ${state.tickCount} · Eventos acumulados: ${state.totalEvents.toLocaleString(`es-ES`)}`;
+      }
+    }
+
+    function renderBanner() {
+      const banner = document.getElementById(`system-banner`);
+      const textEl = document.getElementById(`banner-text`);
+      const metaEl = document.getElementById(`banner-meta`);
+      if (!banner || !textEl || !metaEl) return;
+
+      const activeContainments = state.events.filter(function(e) { return e.result === `FAIL` && e.containmentStatus === `ACTIVA`; }).length;
+
+      banner.className = `status-banner`;
+      if (state.scenario === `offline_buffer` || state.sqliteQueue > 0) {
+        banner.classList.add(`is-critical`);
+        textEl.textContent = state.scenario === `offline_buffer`
+          ? `Contingencia de red activa: las estaciones Edge operan con validación local (< 100 ms) y retienen eventos en buffer SQLite offline (${state.sqliteQueue} registros).`
+          : `Recuperación de enlace en progreso: drenando ${state.sqliteQueue} registros pendientes desde buffer SQLite hacia Mosquitto y MySQL.`;
+      } else if (activeContainments > 0 || state.scenario === `containment_spike`) {
+        banner.classList.add(`is-critical`);
+        textEl.textContent = `Atención operativa: ${activeContainments} alerta(s) de contención FAIL activa(s) en Checkpoints. Se requiere verificación o cuarentena de lote.`;
+      } else if (state.scenario === `mqtt_burst`) {
+        textEl.textContent = `Pico de tráfico MQTT (${state.mqttRate.toLocaleString(`es-ES`)} msg/s): latencia Edge p95 en ${state.edgeP95} ms manteniendo cumplimiento bajo umbral de 100 ms.`;
+      } else {
+        banner.classList.add(`is-healthy`);
+        textEl.textContent = `Cadena Edge-to-Cloud estable: latencia de validación de gates bajo umbral SLA de 100 ms y sincronización MQTT al día.`;
+      }
+
+      metaEl.textContent = state.running ? `Flujo activo · muestreo 1.5 s` : `Telemetría pausada`;
+    }
+
+    function renderKpis() {
+      // 1. Edge Latency
+      const edgeCard = document.getElementById(`kpi-edge-card`);
+      const edgeVal = document.getElementById(`kpi-edge-val`);
+      const edgeChip = document.getElementById(`kpi-edge-chip`);
+      const edgeBar = document.getElementById(`kpi-edge-bar`);
+      const edgeSub = document.getElementById(`kpi-edge-sub`);
+
+      if (edgeVal && edgeChip && edgeBar && edgeSub && edgeCard) {
+        edgeVal.textContent = `${state.edgeP95} ms`;
+        const pct = Math.min(100, Math.round(state.edgeP95));
+        edgeBar.style.width = `${pct}%`;
+        edgeBar.className = `sla-fill`;
+        edgeCard.className = `kpi-tile`;
+
+        if (state.edgeP95 >= 100) {
+          edgeChip.className = `status-chip chip-error`;
+          edgeChip.textContent = `SLA EXCEDIDO`;
+          edgeBar.classList.add(`is-error`);
+          edgeCard.classList.add(`is-alert`);
+          edgeSub.className = `metric-delta is-error`;
+        } else if (state.edgeP95 >= 75) {
+          edgeChip.className = `status-chip chip-amber`;
+          edgeChip.textContent = `CERCA UMBRAL`;
+          edgeBar.classList.add(`is-warn`);
+          edgeCard.classList.add(`is-warn`);
+          edgeSub.className = `metric-delta is-warn`;
+        } else {
+          edgeChip.className = `status-chip chip-sage`;
+          edgeChip.textContent = `SLA < 100 MS`;
+          edgeSub.className = `metric-delta`;
+        }
+        edgeSub.textContent = `Umbral < 100 ms · p50: ${state.edgeP50} ms`;
+      }
+
+      // 2. Mosquitto MQTT
+      const mqttVal = document.getElementById(`kpi-mqtt-val`);
+      const mqttSub = document.getElementById(`kpi-mqtt-sub`);
+      const mqttDelta = document.getElementById(`kpi-mqtt-delta`);
+      const mqttChip = document.getElementById(`kpi-mqtt-chip`);
+      if (mqttVal && mqttSub && mqttDelta && mqttChip) {
+        const connected = state.machines.filter(function(m) { return m.status !== `BUFFER`; }).length;
+        mqttVal.textContent = `${state.mqttRate.toLocaleString(`es-ES`)} msg/s`;
+        mqttSub.textContent = `${connected}/22 ESP conectados · En vuelo: ${state.mqttInFlight}`;
+        mqttDelta.textContent = `Descartes: ${state.mqttDropped}.00% · PubACK ${state.infra.mosquitto.latencyMs} ms`;
+        mqttChip.className = state.scenario === `offline_buffer` ? `status-chip chip-amber` : `status-chip chip-cyan`;
+        mqttChip.textContent = state.scenario === `offline_buffer` ? `ENLACE PARCIAL` : `QoS 1`;
+      }
+
+      // 3. Buffer SQLite Offline
+      const sqCard = document.getElementById(`kpi-sqlite-card`);
+      const sqVal = document.getElementById(`kpi-sqlite-val`);
+      const sqChip = document.getElementById(`kpi-sqlite-chip`);
+      const sqSub = document.getElementById(`kpi-sqlite-sub`);
+      const sqDelta = document.getElementById(`kpi-sqlite-delta`);
+      if (sqCard && sqVal && sqChip && sqSub && sqDelta) {
+        sqVal.textContent = `${state.sqliteQueue.toLocaleString(`es-ES`)} reg.`;
+        sqSub.textContent = `Modo WAL · Uso disco: ${state.sqliteDiskMb} MB`;
+        sqCard.className = `kpi-tile`;
+        if (state.sqliteQueue > 0) {
+          sqCard.classList.add(`is-warn`);
+          sqChip.className = `status-chip chip-amber`;
+          sqChip.textContent = state.scenario === `offline_buffer` ? `MODO OFFLINE` : `DRENANDO`;
+          sqDelta.className = `metric-delta is-warn`;
+          sqDelta.textContent = state.sqliteDrainRate > 0 ? `Drenado activo: ${state.sqliteDrainRate} reg/s` : `Reteniendo eventos locales sin pérdida`;
+        } else {
+          sqChip.className = `status-chip chip-sage`;
+          sqChip.textContent = `SINCRONIZADO`;
+          sqDelta.className = `metric-delta`;
+          sqDelta.textContent = `Cola vacía · Integridad WAL OK`;
+        }
+      }
+
+      // 4. Terminales ESP (22 máquinas)
+      const espVal = document.getElementById(`kpi-esp-val`);
+      const espChip = document.getElementById(`kpi-esp-chip`);
+      const espSub = document.getElementById(`kpi-esp-sub`);
+      const espDelta = document.getElementById(`kpi-esp-delta`);
+      if (espVal && espChip && espSub && espDelta) {
+        const healthyCount = state.machines.filter(function(m) { return m.status === `OK`; }).length;
+        const avgRssi = Math.round(state.machines.reduce(function(acc, m) { return acc + m.rssiDbm; }, 0) / state.machines.length);
+        const pctHealthy = ((healthyCount / 22) * 100).toFixed(1);
+        espVal.textContent = `${pctHealthy}%`;
+        espChip.textContent = `${healthyCount} / 22 OK`;
+        espChip.className = healthyCount === 22 ? `status-chip chip-sage` : `status-chip chip-amber`;
+        espSub.textContent = `RSSI promedio: ${avgRssi} dBm · ESP32-S3`;
+        espDelta.textContent = healthyCount === 22 ? `Todas las terminales reportando` : `${22 - healthyCount} máquina(s) con aviso o buffer`;
+        espDelta.className = healthyCount === 22 ? `metric-delta` : `metric-delta is-warn`;
+      }
+
+      // 5. Calidad y Contención (16 Checkpoints)
+      const qCard = document.getElementById(`kpi-quality-card`);
+      const qVal = document.getElementById(`kpi-quality-val`);
+      const qChip = document.getElementById(`kpi-quality-chip`);
+      const qSub = document.getElementById(`kpi-quality-sub`);
+      const qDelta = document.getElementById(`kpi-quality-delta`);
+      if (qCard && qVal && qChip && qSub && qDelta) {
+        const passRate = ((state.totalPass / state.totalEvents) * 100).toFixed(2);
+        const activeAlerts = state.events.filter(function(e) { return e.result === `FAIL` && e.containmentStatus === `ACTIVA`; }).length;
+        qVal.textContent = `${passRate}% PASS`;
+        qSub.textContent = `Eventos: ${state.totalEvents.toLocaleString(`es-ES`)} · FAIL acum.: ${state.totalFail}`;
+        qCard.className = `kpi-tile`;
+        if (activeAlerts > 0) {
+          qCard.classList.add(`is-alert`);
+          qChip.className = `status-chip chip-error`;
+          qChip.textContent = `${activeAlerts} ACTIVA(S)`;
+          qDelta.className = `metric-delta is-error`;
+          qDelta.textContent = `Contenciones activas: ${activeAlerts} FAIL`;
+        } else {
+          qChip.className = `status-chip chip-sage`;
+          qChip.textContent = `CONTROLADO`;
+          qDelta.className = `metric-delta`;
+          qDelta.textContent = `Sin contenciones pendientes`;
+        }
+      }
+    }
+
+    function renderInfra() {
+      const listEl = document.getElementById(`infra-nodes-list`);
+      const detailEl = document.getElementById(`infra-detail-box`);
+      if (!listEl || !detailEl) return;
+
+      const order = [`mosquitto`, `sqlite`, `fastapi`, `redis`, `mysql`];
+      listEl.innerHTML = order.map(function(key) {
+        const node = state.infra[key];
+        const isSelected = state.selectedInfraId === key;
+        let chipClass = `chip-sage`;
+        if (node.status === `BUFFERING` || node.status === `CARGA ALTA` || node.status === `DEGRADADO`) {
+          chipClass = `chip-amber`;
+        }
+        return `
+          <button type="button" class="infra-node ${isSelected ? `is-selected` : ``}" onclick="selectInfra('${key}')">
+            <div>
+              <div class="infra-node-title">${node.name}</div>
+              <div class="infra-node-sub">${node.role}</div>
+              <div class="infra-metrics-row">
+                <span>${node.rateLabel}</span>
+                <span>Latencia: ${node.latencyMs} ms</span>
+              </div>
+            </div>
+            <div>
+              <span class="status-chip ${chipClass}">${node.status}</span>
+            </div>
+          </button>
+        `;
+      }).join(``);
+
+      const sel = state.infra[state.selectedInfraId] || state.infra.mosquitto;
+      const entries = Object.keys(sel.metrics).map(function(k) {
+        return `
+          <div class="kv-item">
+            <div class="kv-label">${k}</div>
+            <div class="kv-val">${sel.metrics[k]}</div>
+          </div>
+        `;
+      }).join(``);
+
+      detailEl.innerHTML = `
+        <div class="chart-head">
+          <span class="data-label">Detalle técnico: ${sel.name}</span>
+          <span class="status-chip chip-cyan">${sel.latencyMs} ms</span>
+        </div>
+        <div class="detail-kv-grid">${entries}</div>
+      `;
+    }
+
+    function renderMachines() {
+      const gridEl = document.getElementById(`machines-grid`);
+      const inspEl = document.getElementById(`machine-inspector`);
+      const capEl = document.getElementById(`fleet-caption`);
+      if (!gridEl || !inspEl || !capEl) return;
+
+      const visible = state.machines.filter(function(m) {
+        return state.lineFilter === `ALL` || m.line === state.lineFilter;
+      });
+
+      capEl.textContent = `Mostrando ${visible.length} de 22 máquinas · Haz clic para inspeccionar terminal ESP`;
+
+      gridEl.innerHTML = visible.map(function(m) {
+        const isSel = state.selectedMachineId === m.id;
+        let statusCls = ``;
+        let dotCls = `dot-ok`;
+        if (m.status === `FAIL`) {
+          statusCls = `status-fail`;
+          dotCls = `dot-err`;
+        } else if (m.status === `BUFFER`) {
+          statusCls = `status-buffer`;
+          dotCls = `dot-warn`;
+        }
+        return `
+          <button type="button" class="machine-card ${statusCls} ${isSel ? `is-selected` : ``}" onclick="selectMachine('${m.id}')">
+            <div class="machine-top">
+              <span class="machine-id">${m.id}</span>
+              <span class="status-dot ${dotCls}" title="${m.status}"></span>
+            </div>
+            <div class="machine-esp">${m.espId} · L${m.line}</div>
+            <div class="machine-metrics">
+              <span>${m.edgeLatencyMs} ms</span>
+              <span>${m.lastCp}</span>
+            </div>
+          </button>
+        `;
+      }).join(``);
+
+      const sel = state.machines.find(function(m) { return m.id === state.selectedMachineId; }) || state.machines[0];
+      if (!sel) return;
+
+      let chipCls = `chip-sage`;
+      let statusTxt = `EN LÍNEA`;
+      if (sel.status === `FAIL`) {
+        chipCls = `chip-error`;
+        statusTxt = `CONTENCIÓN FAIL`;
+      } else if (sel.status === `BUFFER`) {
+        chipCls = `chip-amber`;
+        statusTxt = `BUFFER SQLITE`;
+      }
+
+      inspEl.innerHTML = `
+        <div class="chart-head">
+          <div>
+            <div class="data-label">Inspector de Máquina &amp; ESP</div>
+            <h3 class="chart-title" style="margin-top: 4px;">${sel.id} · ${sel.espId}</h3>
+          </div>
+          <span class="status-chip ${chipCls}">${statusTxt}</span>
+        </div>
+        <div class="inspector-stats">
+          <div class="kv-item">
+            <div class="kv-label">Línea / Molde</div>
+            <div class="kv-val">Línea ${sel.line} · ${sel.mold}</div>
+          </div>
+          <div class="kv-item">
+            <div class="kv-label">Latencia Gate Edge</div>
+            <div class="kv-val">${sel.edgeLatencyMs} ms</div>
+          </div>
+          <div class="kv-item">
+            <div class="kv-label">Señal RF / Heap ESP</div>
+            <div class="kv-val">${sel.rssiDbm} dBm · ${sel.heapFreePct}% libre</div>
+          </div>
+          <div class="kv-item">
+            <div class="kv-label">Buffer SQLite Local</div>
+            <div class="kv-val">${sel.sqliteBuffer} reg.</div>
+          </div>
+          <div class="kv-item">
+            <div class="kv-label">Lote activo</div>
+            <div class="kv-val">${sel.lot}</div>
+          </div>
+          <div class="kv-item">
+            <div class="kv-label">Último Checkpoint / Ciclos</div>
+            <div class="kv-val">${sel.lastCp} · ${sel.cyclesToday.toLocaleString(`es-ES`)}</div>
+          </div>
+        </div>
+        <div class="button-group">
+          <button type="button" class="btn ${state.filterBySelectedMachine ? `btn-primary` : `btn-secondary`} btn-sm" onclick="toggleMachineTableFilter()">
+            ${state.filterBySelectedMachine ? `Filtrando eventos de ${sel.id}` : `Filtrar eventos de ${sel.id}`}
+          </button>
+        </div>
+      `;
+    }
+
+    function renderCheckpoints() {
+      const gridEl = document.getElementById(`cp-grid`);
+      const clearBtn = document.getElementById(`btn-clear-cp`);
+      const capEl = document.getElementById(`cp-caption`);
+      if (!gridEl || !clearBtn || !capEl) return;
+
+      clearBtn.style.display = state.selectedCheckpointId ? `inline-flex` : `none`;
+      capEl.textContent = state.selectedCheckpointId
+        ? `Filtro activo: ${state.selectedCheckpointId} · Haz clic de nuevo o en Mostrar los 16 para limpiar`
+        : `Validación de flujo de inyección a liberación · Clic en un checkpoint para filtrar la bitácora`;
+
+      gridEl.innerHTML = state.checkpoints.map(function(cp) {
+        const isSel = state.selectedCheckpointId === cp.id;
+        const activeFailCount = state.events.filter(function(e) {
+          return e.cpId === cp.id && e.result === `FAIL` && e.containmentStatus === `ACTIVA`;
+        }).length;
+
+        return `
+          <button type="button" class="cp-card ${activeFailCount > 0 ? `has-containment` : ``} ${isSel ? `is-selected` : ``}" onclick="selectCheckpoint('${cp.id}')">
+            <div class="cp-head">
+              <span class="cp-code">${cp.id}</span>
+              ${activeFailCount > 0
+                ? `<span class="status-chip chip-error">${activeFailCount} FAIL</span>`
+                : `<span class="mono-cell" style="font-size: 0.72rem; color: var(--on-surface-variant);">${cp.avgLatencyMs} ms</span>`}
+            </div>
+            <div class="cp-name">${cp.name}</div>
+            <div class="cp-counts">
+              <span class="cp-pass">PASS ${cp.passCount}</span>
+              <span class="cp-fail">FAIL ${cp.failCount}</span>
+            </div>
+          </button>
+        `;
+      }).join(``);
+    }
+
+    function renderEventsTable() {
+      const tbody = document.getElementById(`events-tbody`);
+      const cap = document.getElementById(`events-summary-caption`);
+      if (!tbody || !cap) return;
+
+      const q = state.searchQuery.trim().toUpperCase();
+
+      const filtered = state.events.filter(function(ev) {
+        if (state.lineFilter !== `ALL` && ev.line !== state.lineFilter) return false;
+        if (state.filterBySelectedMachine && ev.machineId !== state.selectedMachineId) return false;
+        if (state.selectedCheckpointId && ev.cpId !== state.selectedCheckpointId) return false;
+        if (state.resultFilter !== `ALL` && ev.result !== state.resultFilter) return false;
+        if (q) {
+          const hay = `${ev.machineId} ${ev.espId} ${ev.cpId} ${ev.lot} ${ev.partCode} ${ev.reason}`.toUpperCase();
+          if (hay.indexOf(q) === -1) return false;
+        }
+        return true;
+      });
+
+      cap.textContent = `Mostrando ${filtered.length} de ${state.events.length} eventos recientes en memoria`;
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="8" style="text-align: center; padding: var(--space-xl); color: var(--on-surface-variant);">
+              No hay eventos que coincidan con los filtros activos. Ajusta la línea, checkpoint o búsqueda para ver registros.
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      tbody.innerHTML = filtered.slice(0, 30).map(function(ev) {
+        const isFail = ev.result === `FAIL`;
+        const latClass = ev.latencyMs >= 100 ? `color: var(--error);` : (ev.latencyMs >= 75 ? `color: var(--warning);` : `color: var(--on-surface);`);
+        let actionHtml = `<span class="status-chip chip-sage">LIBERADA</span>`;
+        if (isFail) {
+          if (ev.containmentStatus === `ACTIVA`) {
+            actionHtml = `
+              <div style="display: flex; align-items: center; gap: var(--space-xs); flex-wrap: wrap;">
+                <span class="status-chip chip-error">CONTENCIÓN ACTIVA</span>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="quarantineEvent('${ev.id}')">Cuarentena</button>
+              </div>
+            `;
+          } else {
+            actionHtml = `<span class="status-chip chip-amber">${ev.containmentStatus}</span>`;
+          }
+        }
+
+        return `
+          <tr class="${isFail ? `row-fail` : ``}">
+            <td class="mono-cell">${ev.time}</td>
+            <td>
+              <div style="font-weight: 600;">${ev.machineId}</div>
+              <div class="mono-cell" style="font-size: 0.72rem; color: var(--on-surface-variant);">${ev.espId}</div>
+            </td>
+            <td>
+              <span class="status-chip chip-cyan">${ev.cpId}</span>
+            </td>
+            <td>
+              <div class="mono-cell">${ev.lot}</div>
+              <div style="font-size: 0.78rem; color: var(--on-surface-variant);">${ev.partCode} · ${ev.reason}</div>
+            </td>
+            <td class="num-cell" style="${latClass}">${ev.latencyMs} ms</td>
+            <td class="mono-cell" style="font-size: 0.75rem; color: var(--on-surface-variant);">${ev.origin}</td>
+            <td>
+              <span class="status-chip ${isFail ? `chip-error` : `chip-sage`}">${ev.result}</span>
+            </td>
+            <td>${actionHtml}</td>
+          </tr>
+        `;
+      }).join(``);
+    }
+
+    /* ============================================================
+       MANEJADORES DE INTERACCIÓN (FUNCIONES HOISTED)
+       ============================================================ */
+    function setScenario(val) {
+      state.scenario = val;
+      stepTelemetry();
+    }
+
+    function setLineFilter(val) {
+      state.lineFilter = val;
+      const firstInLine = state.machines.find(function(m) {
+        return val === `ALL` || m.line === val;
+      });
+      if (firstInLine && state.lineFilter !== `ALL`) {
+        state.selectedMachineId = firstInLine.id;
+      }
+      renderMachines();
+      renderEventsTable();
+    }
+
+    function toggleTelemetryStream() {
+      state.running = !state.running;
+      const label = document.getElementById(`btn-toggle-label`);
+      const btn = document.getElementById(`btn-toggle-stream`);
+      if (label && btn) {
+        label.textContent = state.running ? `Pausar telemetría` : `Reanudar telemetría`;
+        btn.className = state.running ? `btn btn-primary` : `btn btn-secondary`;
+      }
+      if (state.running) {
+        startTimer();
+      } else {
+        stopTimer();
+      }
+      renderBanner();
+    }
+
+    function injectContainmentFault() {
+      if (!state.machines || state.machines.length === 0) {
+        initData();
+      }
+      const m = state.machines.find(function(item) { return item.id === state.selectedMachineId; }) || state.machines[7] || state.machines[0];
+      if (!m || !state.checkpoints || state.checkpoints.length === 0) return;
+      const cpIdx = randInt(7, 13);
+      const cp = state.checkpoints[cpIdx] || state.checkpoints[0];
+      const timeStr = formatTime(new Date());
+
+      m.status = `FAIL`;
+      m.failCount += 1;
+      m.lastCp = cp.id;
+      cp.failCount += 1;
+      cp.activeContainment += 1;
+      state.totalEvents += 1;
+      state.totalFail += 1;
+
+      state.events.unshift({
+        id: `EVT-FAULT-${Date.now().toString().slice(-4)}`,
+        time: timeStr,
+        machineId: m.id,
+        espId: m.espId,
+        line: m.line,
+        cpId: cp.id,
+        lot: m.lot,
+        partCode: `PZA-${randInt(90000, 99999)}`,
+        latencyMs: Number(randRange(42, 68).toFixed(1)),
+        origin: `MQTT Directo`,
+        result: `FAIL`,
+        reason: FAIL_REASONS[randInt(0, FAIL_REASONS.length - 1)],
+        containmentStatus: `ACTIVA`
+      });
+
+      renderAll();
+    }
+
+    function quarantineEvent(eventId) {
+      const ev = state.events.find(function(item) { return item.id === eventId; });
+      if (!ev) return;
+      ev.containmentStatus = `CUARENTENA`;
+
+      const m = state.machines.find(function(item) { return item.id === ev.machineId; });
+      if (m) {
+        m.failCount = Math.max(0, m.failCount - 1);
+        const stillHasActive = state.events.some(function(item) {
+          return item.machineId === m.id && item.result === `FAIL` && item.containmentStatus === `ACTIVA`;
+        });
+        if (!stillHasActive) {
+          m.status = m.sqliteBuffer > 0 ? `BUFFER` : `OK`;
+        }
+      }
+
+      renderAll();
+    }
+
+    function selectInfra(id) {
+      state.selectedInfraId = id;
+      renderInfra();
+    }
+
+    function selectMachine(id) {
+      state.selectedMachineId = id;
+      renderMachines();
+      if (state.filterBySelectedMachine) {
+        renderEventsTable();
+      }
+    }
+
+    function toggleMachineTableFilter() {
+      state.filterBySelectedMachine = !state.filterBySelectedMachine;
+      renderMachines();
+      renderEventsTable();
+    }
+
+    function selectCheckpoint(cpId) {
+      if (state.selectedCheckpointId === cpId) {
+        state.selectedCheckpointId = null;
+      } else {
+        state.selectedCheckpointId = cpId;
+      }
+      renderCheckpoints();
+      renderEventsTable();
+    }
+
+    function setResultFilter(res) {
+      state.resultFilter = res;
+      const ids = [`ALL`, `FAIL`, `PASS`];
+      ids.forEach(function(k) {
+        const el = document.getElementById(`filter-res-${k}`);
+        if (el) {
+          el.classList.toggle(`is-active`, k === res);
+        }
+      });
+      renderEventsTable();
+    }
+
+    function setSearchQuery(val) {
+      state.searchQuery = val || ``;
+      renderEventsTable();
+    }
+
+    function resetActiveFilters() {
+      state.scenario = `nominal`;
+      state.lineFilter = `ALL`;
+      state.filterBySelectedMachine = false;
+      state.selectedCheckpointId = null;
+      state.resultFilter = `ALL`;
+      state.searchQuery = ``;
+
+      const scenSel = document.getElementById(`scenario-select`);
+      if (scenSel) scenSel.value = `nominal`;
+      const lineSel = document.getElementById(`line-select`);
+      if (lineSel) lineSel.value = `ALL`;
+      const searchInp = document.getElementById(`event-search`);
+      if (searchInp) searchInp.value = ``;
+
+      setResultFilter(`ALL`);
+      renderAll();
+    }
+
+    function startTimer() {
+      stopTimer();
+      streamTimer = setInterval(stepTelemetry, 1500);
+    }
+
+    function stopTimer() {
+      if (streamTimer) {
+        clearInterval(streamTimer);
+        streamTimer = null;
+      }
+    }
+
+    initData();
+
+    document.addEventListener(`DOMContentLoaded`, function() {
+      initCharts();
+      renderAll();
+      if (window.lucide && typeof window.lucide.createIcons === `function`) {
+        window.lucide.createIcons();
+      }
+      startTimer();
+    });
+  </script>
+</body>
+</html>
