@@ -1,0 +1,16 @@
+{
+  "name": "simulador-trazabilidad-aseti",
+  "version": "0.1.0",
+  "description": "Simulación del sistema de trazabilidad CP 01–16: nodos LoRa, puente LoRa→MQTT, MES con genealogía SQL y panel web",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "node --no-warnings src/index.js",
+    "prueba": "node --no-warnings src/index.js --prueba"
+  },
+  "engines": { "node": ">=22.13" },
+  "dependencies": {
+    "aedes": "^1.2.0",
+    "mqtt": "^5.16.1"
+  }
+}

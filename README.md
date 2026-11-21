@@ -1,15 +1,18 @@
 # Trazabilidad · Inyección de plástico (ASETI)
 
-Sistema para validar con escaneo, en cada checkpoint (CP 01–CP 16), que la pieza, el material o la caja sea la correcta, usando dispositivos **LoRa** porque en la planta no se puede cablear y el WiFi tiene interferencia.
+Sistema para validar con escaneo, en cada checkpoint (CP 01–CP 16), que la pieza, el material o la caja sea la correcta, usando dispositivos **LoRa** (no se puede cablear y el WiFi tiene interferencia) con un gateway que traduce a **MQTT** para el servidor.
 
 ## Estructura
 
 | Ruta | Contenido |
 |---|---|
-| `docs/01_CONTEXTO.md` | Problema, planta, los 16 checkpoints reales y preguntas abiertas |
-| `docs/02_ARQUITECTURA.md` | Nodos LoRa, gateway, servidor y principio de validación local |
+| `docs/01_CONTEXTO.md` | Problema, convenciones (OT/TEP), los 16 checkpoints vigentes y preguntas abiertas |
+| `docs/02_ARQUITECTURA.md` | 4 capas, puente LoRa → MQTT, tópicos, formato de mensaje y validación local |
 | `docs/03_DECISIONES.md` | Registro de decisiones con fecha y motivo |
 | `docs/04_BITACORA.md` | Avances y pendientes por fecha |
+| `docs/05_DOCUMENTACION_TECNICA.md` | Protocolo LoRa, MQTT, gates, base de datos, API y paso a hardware |
+| `docs/06_MANUAL_USUARIO.md` | Cómo usar el simulador: pestañas, misiones de la Terminal, fallas y búsqueda |
+| `simulador/` | Simulación funcional: nodos LoRa, puente a MQTT, MES con genealogía y panel web (`npm start`) |
 | `referencias/` | Diagrama de la empresa, foto de la placa y prototipo visual del panel |
 | `PROYECTO_TRAZABILIDAD.md` | **Todo junto en un archivo, para NotebookLM** (generado) |
 

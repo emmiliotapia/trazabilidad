@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Simulador de trazabilidad · Inyección</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="estilos.css">
+</head>
+<body>
+  <header class="barra">
+    <div class="marca">
+      <h1>Trazabilidad de inyección</h1>
+      <p>Simulación: nodos LoRa → gateway → MQTT → MES</p>
+    </div>
+    <dl class="indicadores">
+      <div><dt>Hora de planta</dt><dd id="k-reloj">—</dd></div>
+      <div><dt>Canal LoRa ocupado</dt><dd id="k-ocupacion">—</dd></div>
+      <div><dt>Tramas con colisión</dt><dd id="k-colisiones">—</dd></div>
+      <div><dt>Eventos en MES</dt><dd id="k-eventos">—</dd></div>
+      <div><dt>Tarimas despachadas</dt><dd id="k-tarimas">—</dd></div>
+    </dl>
+    <div class="velocidad">
+      <label for="vel">Velocidad <output id="vel-out">10×</output></label>
+      <input id="vel" type="range" min="1" max="60" value="10">
+    </div>
+  </header>
+
+  <nav class="pestanas" role="tablist">
+    <button role="tab" aria-selected="true" data-vista="planta">Planta</button>
+    <button role="tab" aria-selected="false" data-vista="terminal">Terminal</button>
+    <button role="tab" aria-selected="false" data-vista="radio">Radio y MQTT</button>
+    <button role="tab" aria-selected="false" data-vista="traza">Trazabilidad</button>
+  </nav>
+
+  <ol class="flujo" id="flujo" aria-label="Checkpoints CP 01 a CP 16"></ol>
+
+  <main>
+    <!-- ───────────── PLANTA ───────────── -->
+    <section class="vista" id="vista-planta">
+      <div class="planta">
+        <div class="piso">
+          <h2>Inyectoras <span class="nota">pantalla de cada terminal</span></h2>
+          <div class="maquinas" id="maquinas"></div>
+        </div>
+        <div class="estaciones">
+          <h2>Estaciones</h2>
+          <div id="estaciones"></div>
+        </div>
+      </div>
+
+      <div class="fila-baja">
+        <section class="caja-panel alertas">
+          <h2>Alertas <span class="nota" id="n-pendientes"></span></h2>
+          <ul id="alertas" class="lista-alertas"></ul>
+        </section>
+        <section class="caja-panel controles">
+          <h2>Provocar una falla</h2>
+          <form id="form-falla" class="form-falla">
+            <label>Falla <select id="sel-falla"></select></label>
+            <label>Inyectora <select id="sel-maquina"><option value="">Cualquiera</option></select></label>
+            <button type="submit">Programar falla</button>
+          </form>
+          <form id="form-senal" class="form-falla">
+            <label>Nodo <select id="sel-nodo"></select></label>
+            <label>Minutos <input id="min-senal" type="number" min="1" max="120" value="10"></label>
+            <button type="submit">Cortar señal LoRa</button>
+          </form>
+          <div class="deslizadores">
+            <label>Pérdida por ruido <output id="perd-out">2 %</output><input id="perd" type="range" min="0" max="40" value="2"></label>
+            <label>Una bolsa cada <output id="int-out">90 s</output><input id="int" type="range" min="10" max="240" value="90"></label>
+          </div>
+          <h3>Bitácora de piso</h3>
+          <ul id="bitacora" class="bitacora"></ul>
+        </section>
+      </div>
+    </section>
+
+    <!-- ───────────── TERMINAL MANUAL ───────────── -->
+    <section class="vista" id="vista-terminal" hidden>
+      <div class="mando">
+        <label>Inyectora <select id="m-maquina"></select></label>
+        <button type="button" id="m-tomar" class="btn">Tomar el control</button>
+        <button type="button" id="m-ot" class="btn secundario">Pedir OT nueva</button>
+        <button type="button" id="m-sup" class="btn secundario">Llamar al supervisor</button>
+        <button type="button" id="m-senal-btn" class="btn secundario">Cortar la señal LoRa</button>
+        <p id="m-fase" class="fase"></p>
+      </div>
+      <p id="m-ayuda" class="m-ayuda"></p>
+      <p id="m-mensaje" class="m-mensaje" role="status"></p>
+
+      <div class="banco">
+        <div class="equipo">
+          <div class="torre" aria-label="Torreta Andon">
+            <i class="l-rojo"></i><i class="l-ambar"></i><i class="l-verde"></i>
+          </div>
+          <div class="carcasa">
+            <div class="carcasa-cab"><span id="m-nombre">INY-01</span><span id="m-senal"></span></div>
+            <div class="pantalla-oled" id="m-oled"><div id="m-l1">—</div><div id="m-l2">—</div></div>
+            <div class="arranque" id="m-arranque" aria-label="Lecturas del arranque">
+              <span data-k="gafete">Gafete</span><span data-k="ot">OT</span><span data-k="qr">QR</span>
+            </div>
+            <div class="bufer-vis">
+              <span>Memoria de la terminal</span>
+              <div id="m-bufer" class="pila" aria-live="polite"></div>
+            </div>
+            <form id="m-form-scan" class="lector">
+              <label for="m-scan">Lector de códigos</label>
+              <input id="m-scan" autocomplete="off" spellcheck="false" placeholder="Escanee o escriba un código y presione Enter">
+            </form>
+            <form id="m-form-peso" class="bascula">
+              <label for="m-peso">Báscula <output id="m-peso-out">—</output></label>
+              <input id="m-peso" type="range" min="0" max="3000" step="1" value="0">
+              <button type="submit" class="btn secundario">Poner bolsa en la báscula</button>
+            </form>
+            <p class="ayuda">Si tiene un lector USB que funciona como teclado, haga clic en el campo del lector y escanee: el código entra igual que si lo escribiera.</p>
+          </div>
+        </div>
+
+        <section class="caja-panel misiones">
+          <h2>Misiones <span class="nota" id="m-progreso"></span></h2>
+          <p class="nota-larga">Cada misión enseña una parte del sistema. Se marcan solas cuando la terminal registra lo que piden.</p>
+          <ol id="m-misiones" class="lista-misiones"></ol>
+        </section>
+      </div>
+
+      <section class="caja-panel etiquetas">
+        <h2>Etiquetas a la mano <span class="nota">haga clic en una para escanearla</span></h2>
+        <div id="m-etiquetas"></div>
+      </section>
+
+      <section class="caja-panel viaje-panel">
+        <header class="viaje-cab">
+          <h2>Viaje del mensaje</h2>
+          <label class="pausa"><input type="checkbox" id="m-lento" checked> Cámara lenta</label>
+        </header>
+        <p class="nota-larga" id="m-viaje-titulo">Escanee algo para ver por dónde pasa el mensaje.</p>
+        <div class="viaje" id="m-viaje">
+          <div class="via" aria-hidden="true"></div>
+          <div class="estacion-v" data-i="0"><b>Terminal</b><small>ESP32 en la máquina</small><p></p></div>
+          <div class="estacion-v aire" data-i="1"><b>Aire LoRa</b><small>915 MHz, sin cables</small><p></p></div>
+          <div class="estacion-v" data-i="2"><b>Gateway</b><small>radio junto al servidor</small><p></p></div>
+          <div class="estacion-v" data-i="3"><b>Puente</b><small>binario a JSON</small><p></p></div>
+          <div class="estacion-v" data-i="4"><b>Broker MQTT</b><small>reparte los mensajes</small><p></p></div>
+          <div class="estacion-v" data-i="5"><b>MES</b><small>base de datos y gates</small><p></p></div>
+          <span class="paquete" id="m-paquete" hidden></span>
+        </div>
+        <p class="explica" id="m-explica" role="status"></p>
+        <div class="trama-escaneo">
+          <h3>Bytes que viajaron por radio</h3>
+          <div class="bytes" id="m-bytes"><span class="vacio">Todavía no hay trama.</span></div>
+          <ul class="leyenda" id="m-leyenda"></ul>
+        </div>
+      </section>
+
+      <section class="caja-panel">
+        <h2>Escaneos de esta sesión</h2>
+        <ul class="historial-scan" id="m-historial"></ul>
+      </section>
+    </section>
+
+    <!-- ───────────── RADIO Y MQTT ───────────── -->
+    <section class="vista" id="vista-radio" hidden>
+      <section class="traductor" aria-live="off">
+        <header>
+          <h2>Traducción de una trama</h2>
+          <p>Lo que viaja por radio y lo que el puente publica en MQTT. <label class="pausa"><input type="checkbox" id="congelar"> Detener en la trama actual</label></p>
+        </header>
+        <div class="trama-meta" id="tr-meta"></div>
+        <div class="bytes" id="tr-bytes"></div>
+        <ul class="leyenda" id="tr-leyenda"></ul>
+        <div class="json-salida">
+          <div class="topico" id="tr-topico"></div>
+          <pre id="tr-json"></pre>
+        </div>
+      </section>
+
+      <div class="radio-cols">
+        <section class="caja-panel">
+          <h2>Aire LoRa</h2>
+          <dl class="mini-stats" id="radio-stats"></dl>
+          <table class="tabla" id="tabla-aire">
+            <thead><tr><th>Hora</th><th>Sentido</th><th>Nodo</th><th>Tipo</th><th>Bytes</th><th>ms aire</th><th>RSSI</th><th>Resultado</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </section>
+        <section class="caja-panel">
+          <h2>Broker MQTT <span class="nota" id="mqtt-url"></span></h2>
+          <label class="filtro">Filtrar tópico <input id="filtro-mqtt" placeholder="evento, cmd, alerta, erp…"></label>
+          <ul class="mqtt" id="mqtt"></ul>
+        </section>
+      </div>
+    </section>
+
+    <!-- ───────────── TRAZABILIDAD ───────────── -->
+    <section class="vista" id="vista-traza" hidden>
+      <form id="form-busca" class="busca">
+        <label for="q">Buscar por OT, bolsa, caja, tarima o lote de resina</label>
+        <div>
+          <input id="q" placeholder="OT-2611-001, OT-2611-001-B004, CJ-000003, TR-0001, LMP-2611-001" autocomplete="off">
+          <button type="submit">Rastrear</button>
+        </div>
+      </form>
+      <div id="genealogia" class="genealogia"></div>
+      <section class="caja-panel">
+        <h2>Órdenes de trabajo recientes</h2>
+        <table class="tabla" id="tabla-ots">
+          <thead><tr><th>OT</th><th>Máquina</th><th>Producto</th><th>Estado</th><th>Bolsas</th><th>Cajas cerradas</th><th>Despachadas</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </section>
+    </section>
+  </main>
+
+  <script src="app.js" type="module"></script>
+</body>
+</html>
