@@ -475,7 +475,7 @@ button[type='submit']:hover { background: #2f4352; }
 
 /* ───────── seguir una OT ───────── */
 :root { --sigue: #5b3cc4; }
-.seguir { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.75rem; margin-bottom: 0.9rem; padding: 0.55rem 0.8rem; background: var(--papel); border: 1px solid var(--linea); border-left: 4px solid var(--sigue); border-radius: var(--r); }
+.seguir { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.75rem; margin-bottom: 0.9rem; padding: 0.55rem 0.8rem; background: #f3f0fb; border: 1px solid #d6cdf2; border-radius: var(--r); }
 .seguir label { font: 600 1.05rem var(--cond); }
 .seguir select { min-width: 300px; }
 .seguir-info { flex: 1 1 320px; margin: 0; font-size: 0.88rem; color: var(--tinta-2); }
@@ -492,8 +492,8 @@ body.siguiendo .flujo li.ot-fail { box-shadow: inset 0 -4px 0 var(--rojo); }
 
 body.siguiendo .term:not(.ot-toca) { opacity: 0.4; }
 .term.ot-toca { box-shadow: 0 0 0 2px var(--sigue); }
-.term.ot-aqui { box-shadow: 0 0 0 3px var(--sigue), 0 0 14px rgba(91, 60, 196, 0.45); animation: aqui 1.6s ease-in-out infinite; }
-@keyframes aqui { 50% { box-shadow: 0 0 0 3px var(--sigue), 0 0 2px rgba(91, 60, 196, 0.2); } }
+.term.ot-aqui { box-shadow: 0 0 0 3px var(--sigue); outline: 2px solid var(--sigue); outline-offset: 2px; animation: aqui 1.6s ease-in-out infinite; }
+@keyframes aqui { 50% { outline-offset: 6px; outline-color: transparent; } }
 .maquinas .term { cursor: pointer; }
 .maquinas .term:hover { border-color: var(--sigue); }
 
