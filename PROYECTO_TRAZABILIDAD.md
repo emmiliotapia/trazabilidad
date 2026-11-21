@@ -1,6 +1,6 @@
 # Proyecto de Trazabilidad · Inyección de plástico (documento consolidado)
 
-> Generado el 2026-11-21 15:22. Este archivo se arma a partir de docs/. No editarlo a mano.
+> Generado el 2026-11-21 15:30. Este archivo se arma a partir de docs/. No editarlo a mano.
 
 
 ---
@@ -718,6 +718,15 @@ Cada vez que se inicia, la planta empieza vacía. Las primeras bolsas aparecen e
 
 ## 4. Pestaña Planta
 
+**Seguir una OT.** Arriba de las inyectoras. Elija una OT en la lista o haga clic en la tarjeta de una inyectora para seguir la OT que está produciendo. Todo lo que no tiene que ver con esa OT se atenúa y queda resaltado en morado:
+
+- En la línea de checkpoints, los CP por los que ya pasó (rayita morada; roja si hubo falla) y la marca **llegó hasta aquí** en el CP más avanzado. Una OT puede estar en varios CP a la vez: unas bolsas se siguen moldeando mientras otras ya están en caja.
+- Las estaciones que la han tocado (materia prima, mezanina, su inyectora, la mesa de SM1, PT, cámara). La que tuvo la última actividad parpadea.
+- Sus alertas y sus líneas de la bitácora.
+- Un resumen: máquina, producto, bolsas, cajas, tarimas, fallas, hasta qué CP llegó y la última actividad.
+
+Se actualiza solo cada 2 segundos. **Ver genealogía** abre su árbol completo en la pestaña Trazabilidad; **Dejar de seguir** quita el resaltado.
+
 **Inyectoras.** Cada tarjeta es la pantalla de una terminal. El color es el de su torreta Andon:
 
 | Color | Significado |
@@ -731,9 +740,9 @@ Si una tarjeta dice **sin señal** o muestra un número en **búfer**, la termin
 
 **Estaciones.** Almacén MP, mezanina, SM1 (con la pantalla AV de cada mesa), almacén PT y cámara de embarque.
 
-**Alertas.** Cada falla detectada, con la hora, el CP y la estación. "Pendientes" son reglas que el servidor está esperando confirmar porque falta un escaneo de otra estación.
+**Alertas** (debajo de las inyectoras). Cada falla detectada, con la hora, el CP y la estación. "Pendientes" son reglas que el servidor está esperando confirmar porque falta un escaneo de otra estación.
 
-**Provocar una falla.** Elija una falla y, si quiere, la inyectora. La falla ocurre en la próxima oportunidad:
+**Provocar una falla** (junto a las alertas). Elija una falla y, si quiere, la inyectora. La falla ocurre en la próxima oportunidad:
 
 | Falla | CP | Qué debería ver |
 |---|---|---|

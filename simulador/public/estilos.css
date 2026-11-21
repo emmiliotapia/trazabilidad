@@ -472,3 +472,34 @@ button[type='submit']:hover { background: #2f4352; }
   .viaje { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .via, .paquete, .estacion-v::before { display: none; }
 }
+
+/* ───────── seguir una OT ───────── */
+:root { --sigue: #5b3cc4; }
+.seguir { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.75rem; margin-bottom: 0.9rem; padding: 0.55rem 0.8rem; background: var(--papel); border: 1px solid var(--linea); border-left: 4px solid var(--sigue); border-radius: var(--r); }
+.seguir label { font: 600 1.05rem var(--cond); }
+.seguir select { min-width: 300px; }
+.seguir-info { flex: 1 1 320px; margin: 0; font-size: 0.88rem; color: var(--tinta-2); }
+.seguir-info b { color: var(--sigue); font-family: var(--mono); }
+.seguir-info .f { color: var(--rojo); font-weight: 600; }
+.seguir-info .ultimo { color: var(--tinta); }
+
+.flujo li, .term, .lista-alertas li, .bitacora li { transition: opacity 0.3s, box-shadow 0.3s; }
+body.siguiendo .flujo li:not(.ot-pass):not(.ot-fail) { opacity: 0.3; }
+body.siguiendo .flujo li.ot-pass { box-shadow: inset 0 -4px 0 var(--sigue); }
+body.siguiendo .flujo li.ot-fail { box-shadow: inset 0 -4px 0 var(--rojo); }
+.flujo li.ot-actual { outline: 3px solid var(--sigue); outline-offset: 1px; z-index: 1; }
+.flujo li.ot-actual::before { content: 'llegó hasta aquí'; position: absolute; top: -9px; left: 50%; transform: translateX(-50%); padding: 0 0.4rem; border-radius: 8px; background: var(--sigue); color: #fff; font-size: 0.66rem; font-weight: 600; line-height: 1.4; white-space: nowrap; }
+
+body.siguiendo .term:not(.ot-toca) { opacity: 0.4; }
+.term.ot-toca { box-shadow: 0 0 0 2px var(--sigue); }
+.term.ot-aqui { box-shadow: 0 0 0 3px var(--sigue), 0 0 14px rgba(91, 60, 196, 0.45); animation: aqui 1.6s ease-in-out infinite; }
+@keyframes aqui { 50% { box-shadow: 0 0 0 3px var(--sigue), 0 0 2px rgba(91, 60, 196, 0.2); } }
+.maquinas .term { cursor: pointer; }
+.maquinas .term:hover { border-color: var(--sigue); }
+
+body.siguiendo .lista-alertas li:not(.ot-suya), body.siguiendo .bitacora li:not(.ot-suya) { opacity: 0.35; }
+.lista-alertas li.ot-suya, .bitacora li.ot-suya { box-shadow: inset 3px 0 0 var(--sigue); padding-left: 0.5rem; }
+
+.piso .fila-baja { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+@media (max-width: 1400px) { .piso .fila-baja { grid-template-columns: 1fr; } }
+@media (prefers-reduced-motion: reduce) { .term.ot-aqui { animation: none; } }

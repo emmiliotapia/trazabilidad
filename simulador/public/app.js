@@ -67,9 +67,12 @@ function actualizarNodos(nodos) {
     if (n.tipo === 'inyectora') {
       if (!ui.maquinas.has(n.nombre)) {
         const t = terminal(n);
+        t.el.title = 'Clic para seguir la OT de esta máquina';
+        t.el.onclick = () => t.ot && seguirOT(t.ot);
         ui.maquinas.set(n.nombre, t);
         $('#maquinas').append(t.el);
       }
+      ui.maquinas.get(n.nombre).ot = n.ot;
       pintarTerminal(ui.maquinas.get(n.nombre), n);
       continue;
     }
@@ -111,7 +114,7 @@ function actualizarAlertas(mes) {
     ...mes.pendientes.map((p) => h('li', { class: 'pend', 'data-nivel': 'ambar' },
       h('span', { class: 'hora', text: `${Math.max(0, p.venceEnS)} s` }), h('span', { class: 'cpx', text: `CP ${p.cp}` }),
       h('span', {}, 'En espera de conciliar: ', p.descripcion))),
-    ...mes.alertas.map((a) => h('li', { 'data-nivel': a.nivel },
+    ...mes.alertas.map((a) => h('li', { 'data-nivel': a.nivel, 'data-ot': a.ot ?? '' },
       h('span', { class: 'hora', text: hora(a.ts) }), h('span', { class: 'cpx', text: `CP ${a.cp}` }),
       h('span', {}, a.mensaje, a.origen === 'mes' ? h('span', { class: 'origen-mes', text: 'gate central MES' }) : null, h('div', { class: 'quien', text: [a.nodo, a.ot].filter(Boolean).join(' · ') })))),
   ];
@@ -146,7 +149,105 @@ function actualizarEstado(e) {
     tr.onclick = () => rastrear(o.ot);
     return tr;
   }));
+  llenarOTs(e.mes.otsRecientes);
+  aplicarSeguimiento();
 }
+
+
+// ───────────── seguir una OT ─────────────
+// Resalta el camino de una OT: CP por los que pasó, el paso actual, las estaciones que la tocaron, sus alertas y su bitácora.
+const seguir = { ot: null, g: null, firmaLista: '' };
+const plantaVisible = () => !$('#vista-planta').hidden;
+
+function seguirOT(ot) {
+  seguir.ot = ot || null;
+  seguir.g = null;
+  $('#sel-ot').value = seguir.ot ?? '';
+  $('#seguir-ver').hidden = !seguir.ot;
+  $('#seguir-quitar').hidden = !seguir.ot;
+  if (seguir.ot) cargarSeguimiento();
+  aplicarSeguimiento();
+}
+
+async function cargarSeguimiento() {
+  const ot = seguir.ot;
+  if (!ot) return;
+  const r = await fetch(`/api/genealogia?id=${encodeURIComponent(ot)}`);
+  if (seguir.ot !== ot) return;
+  seguir.g = r.ok ? await r.json() : null;
+  aplicarSeguimiento();
+}
+
+function llenarOTs(ots) {
+  const firma = ots.map((o) => `${o.ot}${o.estado}`).join('|');
+  if (firma === seguir.firmaLista) return;
+  seguir.firmaLista = firma;
+  const sel = $('#sel-ot');
+  sel.replaceChildren(h('option', { value: '', text: 'Ninguna' }),
+    ...ots.map((o) => h('option', { value: o.ot, text: `${o.ot} · ${o.id_maquina ?? 'sin máquina'} · ${o.estado.replaceAll('_', ' ').toLowerCase()}` })));
+  if (seguir.ot && !ots.some((o) => o.ot === seguir.ot)) sel.append(h('option', { value: seguir.ot, text: seguir.ot }));
+  sel.value = seguir.ot ?? '';
+}
+
+function aplicarSeguimiento() {
+  const ot = seguir.ot;
+  const g = seguir.g?.orden?.ot === ot ? seguir.g : null;
+  document.body.classList.toggle('siguiendo', !!ot);
+  const estadoCP = new Map(); // cp → pass | fail
+  const nodosOT = new Set();
+  let ultimo = null;
+  if (g) {
+    if (g.lotes.length) {
+      estadoCP.set(1, 'pass');
+      estadoCP.set(2, 'pass');
+      nodosOT.add('MP-01');
+    }
+    for (const e of g.eventos) {
+      const previo = estadoCP.get(e.cp);
+      estadoCP.set(e.cp, e.resultado === 'PASS' || previo === 'pass' ? 'pass' : 'fail');
+      nodosOT.add(e.nodo);
+      ultimo = e;
+    }
+    nodosOT.add(g.orden.id_maquina);
+  }
+  const masLejos = estadoCP.size ? Math.max(...estadoCP.keys()) : null;
+  for (const [n, x] of ui.cpCuenta) {
+    x.li.classList.toggle('ot-pass', estadoCP.get(n) === 'pass');
+    x.li.classList.toggle('ot-fail', estadoCP.get(n) === 'fail');
+    x.li.classList.toggle('ot-actual', masLejos === n);
+  }
+  for (const [nombre, t] of [...ui.maquinas, ...ui.estaciones]) {
+    t.el.classList.toggle('ot-toca', nodosOT.has(nombre));
+    t.el.classList.toggle('ot-aqui', !!ultimo && ultimo.nodo === nombre);
+  }
+  for (const li of document.querySelectorAll('#alertas li')) li.classList.toggle('ot-suya', !!ot && li.dataset.ot === ot);
+  for (const li of document.querySelectorAll('#bitacora li')) li.classList.toggle('ot-suya', !!ot && li.textContent.includes(ot));
+
+  const info = $('#seguir-info');
+  if (!ot) {
+    info.textContent = 'Elija una OT o haga clic en una inyectora para resaltar su camino por la planta.';
+    return;
+  }
+  if (!g) {
+    info.textContent = `${ot}: cargando su recorrido…`;
+    return;
+  }
+  const o = g.orden;
+  const bolsas = g.cajas.reduce((s, c) => s + c.bolsas.length, 0) + g.sinCaja.length;
+  const tarimas = new Set(g.cajas.map((c) => c.tarima?.id_tarima).filter(Boolean)).size;
+  const fallas = g.eventos.filter((e) => e.resultado !== 'PASS').length;
+  info.replaceChildren(
+    h('b', { text: o.ot }), ` · ${o.id_maquina ?? 'sin máquina'} · ${o.sku_producto} · ${o.estado.replaceAll('_', ' ').toLowerCase()} · `,
+    `${bolsas}/${o.total_bolsas} bolsas · ${g.cajas.length} cajas · ${tarimas} tarimas`,
+    fallas ? h('span', { class: 'f', text: ` · ${fallas} ${fallas === 1 ? 'falla' : 'fallas'}` }) : '',
+    masLejos ? h('span', { class: 'ultimo', text: ` · llegó hasta CP ${String(masLejos).padStart(2, '0')}` }) : '',
+    ultimo ? ` · última actividad: CP ${String(ultimo.cp).padStart(2, '0')} en ${ultimo.nodo} a las ${hora(ultimo.ts_nodo)}` : '');
+}
+
+$('#sel-ot').onchange = (e) => seguirOT(e.target.value);
+$('#seguir-quitar').onclick = () => seguirOT(null);
+$('#seguir-ver').onclick = () => seguir.ot && rastrear(seguir.ot);
+setInterval(() => seguir.ot && plantaVisible() && cargarSeguimiento(), 2000);
 
 // ───────────── traductor de tramas ─────────────
 
