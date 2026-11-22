@@ -196,6 +196,7 @@ main { padding: 1rem 1.5rem 2rem; }
 .lista-alertas .origen-mes { display: inline-block; font-size: 0.72rem; padding: 0 0.35rem; border-radius: 3px; background: var(--rol-charolero); margin-left: 0.3rem; }
 .lista-alertas .pend { background: #fff8e3; }
 .vacio { color: var(--tinta-2); font-size: 0.88rem; padding: 0.5rem 0; }
+.lista-alertas li.vacio { display: block; }
 
 .form-falla { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-bottom: 0.7rem; align-items: end; }
 .form-falla label { display: grid; gap: 0.15rem; font-size: 0.8rem; color: var(--tinta-2); }

@@ -75,7 +75,7 @@ function actualizarNodos(nodos) {
         ui.maquinas.set(n.nombre, t);
         $('#maquinas').append(t.el);
       }
-      Object.assign(ui.maquinas.get(n.nombre), { ot: n.ot, color: n.pantalla.color, l2: n.pantalla.l2, sinSenal: n.sinSenal });
+      Object.assign(ui.maquinas.get(n.nombre), { ot: n.ot, color: n.pantalla.color, textoPantalla: n.pantalla.l2, sinSenal: n.sinSenal });
       pintarTerminal(ui.maquinas.get(n.nombre), n);
       continue;
     }
@@ -209,7 +209,7 @@ function actualizarResumenLineas(e) {
       p.dataset.color = t.color;
       p.classList.toggle('sin-senal', !!t.sinSenal);
       p.textContent = nombre.slice(-2);
-      p.title = `${nombre} · ${t.ot ?? 'sin OT'} · ${t.l2 ?? ''}${t.sinSenal ? ' · sin señal' : ''}`;
+      p.title = `${nombre} · ${t.ot ?? 'sin OT'} · ${t.textoPantalla ?? ''}${t.sinSenal ? ' · sin señal' : ''}`;
       c[t.color] = (c[t.color] ?? 0) + 1;
       if (t.sinSenal) sinSenal++;
     }
