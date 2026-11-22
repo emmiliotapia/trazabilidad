@@ -8,7 +8,7 @@
 **Hecho**
 - La planta simulada ahora tiene 3 líneas: L1 con 22, L2 con 20 y L3 con 9 inyectoras (51), con estaciones compartidas. Máquinas `L1-INY-01`…, ID de nodo = línea × 100 + número, estaciones en el 900 (D14, D15).
 - Radio: un gateway multicanal; cada línea en su canal, estaciones compartidas en otro y las mesas de SM1 en dos más (D16). El panel muestra la ocupación de cada canal y la columna Canal en el aire LoRa.
-- Planta: botones Toda la planta / Línea 1 / 2 / 3. La vista de toda la planta resume cada línea con una luz por máquina; al seguir una OT se salta a su línea. Menús agrupados por línea.
+- Planta: se prende y apaga cada línea (una o varias) y se elige ver **Resumen** (una luz por máquina) o **Tarjetas**. Al seguir una OT de una línea apagada, se prende. Menús agrupados por línea.
 - Capacidad de estaciones compartidas ajustada para 51 máquinas: 3 operadores de resina, 4 mesas SM1, 2 puestos PT (D17, supuesto).
 
 **Pendiente**

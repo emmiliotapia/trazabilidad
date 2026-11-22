@@ -49,11 +49,18 @@
       <div class="planta">
         <div class="piso">
           <div class="piso-cab">
-            <h2>Inyectoras</h2>
-            <div class="lineas" id="lineas" role="group" aria-label="Qué línea ver"></div>
+            <h2>Inyectoras <span class="nota" id="piso-nota"></span></h2>
+            <div class="selector">
+              <span class="etq" id="etq-lineas">Líneas</span>
+              <div class="lineas" id="lineas" role="group" aria-labelledby="etq-lineas"></div>
+            </div>
+            <div class="selector">
+              <span class="etq" id="etq-modo">Ver como</span>
+              <div class="lineas" id="modo-piso" role="group" aria-labelledby="etq-modo"></div>
+            </div>
           </div>
           <div class="resumen-lineas" id="resumen-lineas"></div>
-          <div class="maquinas" id="maquinas" data-ver="todas"></div>
+          <div class="maquinas" id="maquinas" hidden></div>
           <div class="fila-baja">
             <section class="caja-panel alertas">
               <h2>Alertas <span class="nota" id="n-pendientes"></span></h2>

@@ -71,6 +71,7 @@ function actualizarNodos(nodos) {
         t.el.onclick = () => t.ot && seguirOT(t.ot);
         t.el.dataset.linea = n.linea;
         t.linea = n.linea;
+        t.el.hidden = vistaPiso.lineas.size > 0 && !vistaPiso.lineas.has(n.linea);
         ui.maquinas.set(n.nombre, t);
         $('#maquinas').append(t.el);
       }
@@ -110,33 +111,65 @@ function actualizarNodos(nodos) {
 }
 
 // ───────────── líneas de producción ─────────────
-// "Toda la planta" muestra una fila por línea con una luz por máquina (el color de su torreta);
-// al elegir una línea se ven las tarjetas completas solo de esa línea.
+// Se eligen una o varias líneas (cada botón se prende y se apaga) y cómo verlas:
+// "Resumen" = una fila por línea con una luz por máquina; "Tarjetas" = la pantalla completa de cada máquina.
 // Quién transmite en cada canal: "línea 2" o los nombres de las estaciones compartidas
 function nombreCanal(c, e) {
   if (Number(c) <= (e.lineas?.length ?? 0)) return `línea ${c}`;
   return e.nodos.filter((n) => n.canal === Number(c)).map((n) => n.nombre).join(', ');
 }
-let verLinea = localStorage.getItem('ver-linea') || 'todas';
+const vistaPiso = {
+  lineas: new Set(JSON.parse(localStorage.getItem('ver-lineas') || '[]')),
+  modo: localStorage.getItem('ver-modo') === 'tarjetas' ? 'tarjetas' : 'resumen',
+  total: 0,
+};
 
 function armarLineas(lineas) {
   if (!lineas?.length) return;
-  if (verLinea !== 'todas' && !(Number(verLinea) <= lineas.length)) verLinea = 'todas';
-  const boton = (valor, texto) => {
-    const b = h('button', { type: 'button', 'data-ver': valor, text: texto });
-    b.onclick = () => elegirLinea(valor);
-    return b;
-  };
-  $('#lineas').replaceChildren(boton('todas', 'Toda la planta'), ...lineas.map((n, i) => boton(String(i + 1), `Línea ${i + 1} · ${n}`)));
-  elegirLinea(verLinea);
+  vistaPiso.total = lineas.length;
+  for (const l of vistaPiso.lineas) if (!(l >= 1 && l <= lineas.length)) vistaPiso.lineas.delete(l);
+  if (!vistaPiso.lineas.size) lineas.forEach((_, i) => vistaPiso.lineas.add(i + 1));
+  const boton = (texto, onclick, datos) => h('button', { type: 'button', text: texto, onclick, ...datos });
+  $('#lineas').replaceChildren(
+    boton('Todas', () => verLineas(lineas.map((_, i) => i + 1)), { 'data-todas': '1' }),
+    ...lineas.map((n, i) => boton(`Línea ${i + 1} · ${n}`, () => alternarLinea(i + 1), { 'data-linea': String(i + 1) })));
+  $('#modo-piso').replaceChildren(
+    boton('Resumen', () => verModo('resumen'), { 'data-modo': 'resumen' }),
+    boton('Tarjetas', () => verModo('tarjetas'), { 'data-modo': 'tarjetas' }));
+  pintarVistaPiso();
 }
 
-function elegirLinea(valor) {
-  verLinea = String(valor);
-  localStorage.setItem('ver-linea', verLinea);
-  $('#maquinas').dataset.ver = verLinea;
-  $('#resumen-lineas').hidden = verLinea !== 'todas';
-  for (const b of $('#lineas').children) b.setAttribute('aria-pressed', String(b.dataset.ver === verLinea));
+// Prende o apaga una línea; siempre queda al menos una
+function alternarLinea(l) {
+  if (vistaPiso.lineas.has(l)) {
+    if (vistaPiso.lineas.size > 1) vistaPiso.lineas.delete(l);
+  } else vistaPiso.lineas.add(l);
+  pintarVistaPiso();
+}
+function verLineas(lista, modo) {
+  vistaPiso.lineas = new Set(lista);
+  if (modo) vistaPiso.modo = modo;
+  pintarVistaPiso();
+}
+function verModo(modo) {
+  vistaPiso.modo = modo;
+  pintarVistaPiso();
+}
+
+function pintarVistaPiso() {
+  localStorage.setItem('ver-lineas', JSON.stringify([...vistaPiso.lineas]));
+  localStorage.setItem('ver-modo', vistaPiso.modo);
+  for (const b of $('#lineas').children) {
+    const on = b.dataset.todas ? vistaPiso.lineas.size === vistaPiso.total : vistaPiso.lineas.has(Number(b.dataset.linea));
+    b.setAttribute('aria-pressed', String(on));
+  }
+  for (const b of $('#modo-piso').children) b.setAttribute('aria-pressed', String(b.dataset.modo === vistaPiso.modo));
+  $('#resumen-lineas').hidden = vistaPiso.modo !== 'resumen';
+  $('#maquinas').hidden = vistaPiso.modo !== 'tarjetas';
+  for (const t of ui.maquinas.values()) t.el.hidden = !vistaPiso.lineas.has(t.linea);
+  for (const f of ui.filasLinea ?? []) f.el.hidden = !vistaPiso.lineas.has(f.linea);
+  const n = vistaPiso.lineas.size;
+  $('#piso-nota').textContent = n === vistaPiso.total ? 'toda la planta' : `${n === 1 ? 'línea' : 'líneas'} ${[...vistaPiso.lineas].sort().join(' y ')}`;
 }
 
 const lineaDe = (maquina) => Number(/^L(\d+)-/.exec(maquina ?? '')?.[1]) || null;
@@ -151,11 +184,12 @@ function actualizarResumenLineas(e) {
       const cuentas = h('p', { class: 'cuentas' });
       const fila = h('section', { class: 'fila-linea' },
         h('header', {}, h('h3', { text: `Línea ${linea}` }), h('span', { class: 'nota', text: `${n} inyectoras · canal LoRa ${linea}` }),
-          h('button', { type: 'button', class: 'btn secundario', text: 'Ver tarjetas', onclick: () => elegirLinea(linea) })),
+          h('button', { type: 'button', class: 'btn secundario', text: 'Ver tarjetas', onclick: () => verLineas([linea], 'tarjetas') })),
         luces, cuentas);
       cont.append(fila);
-      return { linea, luces, cuentas, puntos: new Map() };
+      return { el: fila, linea, luces, cuentas, puntos: new Map() };
     });
+    pintarVistaPiso();
   }
   const otsLinea = new Map();
   for (const o of e.mes.otsRecientes) if (o.estado !== 'COMPLETO') otsLinea.set(lineaDe(o.id_maquina), (otsLinea.get(lineaDe(o.id_maquina)) ?? 0) + 1);
@@ -167,7 +201,7 @@ function actualizarResumenLineas(e) {
       let p = f.puntos.get(nombre);
       if (!p) {
         p = h('button', { type: 'button', class: 'luz' });
-        p.onclick = () => (t.ot ? seguirOT(t.ot) : elegirLinea(f.linea));
+        p.onclick = () => (t.ot ? seguirOT(t.ot) : verLineas([f.linea], 'tarjetas'));
         f.puntos.set(nombre, p);
         ui.luces.set(nombre, p);
         f.luces.append(p);
@@ -264,7 +298,7 @@ async function cargarSeguimiento() {
   if (seguir.g && seguir.cambio) {
     seguir.cambio = false;
     const l = lineaDe(seguir.g.orden.id_maquina);
-    if (l && verLinea !== 'todas' && Number(verLinea) !== l) elegirLinea(l);
+    if (l && !vistaPiso.lineas.has(l)) alternarLinea(l);
   }
   aplicarSeguimiento();
 }

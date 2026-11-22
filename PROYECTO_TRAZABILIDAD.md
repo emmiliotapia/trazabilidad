@@ -1,6 +1,6 @@
 # Proyecto de Trazabilidad · Inyección de plástico (documento consolidado)
 
-> Generado el 2026-11-21 18:12. Este archivo se arma a partir de docs/. No editarlo a mano.
+> Generado el 2026-11-21 18:20. Este archivo se arma a partir de docs/. No editarlo a mano.
 
 
 ---
@@ -337,7 +337,7 @@ En `simulador/` está la arquitectura completa funcionando en software (ver `sim
 **Hecho**
 - La planta simulada ahora tiene 3 líneas: L1 con 22, L2 con 20 y L3 con 9 inyectoras (51), con estaciones compartidas. Máquinas `L1-INY-01`…, ID de nodo = línea × 100 + número, estaciones en el 900 (D14, D15).
 - Radio: un gateway multicanal; cada línea en su canal, estaciones compartidas en otro y las mesas de SM1 en dos más (D16). El panel muestra la ocupación de cada canal y la columna Canal en el aire LoRa.
-- Planta: botones Toda la planta / Línea 1 / 2 / 3. La vista de toda la planta resume cada línea con una luz por máquina; al seguir una OT se salta a su línea. Menús agrupados por línea.
+- Planta: se prende y apaga cada línea (una o varias) y se elige ver **Resumen** (una luz por máquina) o **Tarjetas**. Al seguir una OT de una línea apagada, se prende. Menús agrupados por línea.
 - Capacidad de estaciones compartidas ajustada para 51 máquinas: 3 operadores de resina, 4 mesas SM1, 2 puestos PT (D17, supuesto).
 
 **Pendiente**
@@ -784,12 +784,14 @@ Cada vez que se inicia, la planta empieza vacía. Las primeras bolsas aparecen e
 
 Se actualiza solo cada 2 segundos. **Ver genealogía** abre su árbol completo en la pestaña Trazabilidad; **Dejar de seguir** quita el resaltado.
 
-**Líneas.** Junto al título "Inyectoras" están los botones **Toda la planta**, **Línea 1 · 22**, **Línea 2 · 20** y **Línea 3 · 9**. El panel recuerda cuál eligió.
+**Líneas.** Junto al título "Inyectoras" hay dos grupos de botones. El panel recuerda lo que eligió.
 
-- **Toda la planta:** una fila por línea con una luz por máquina, del color de su torreta (con rayas si está sin señal), y cuántas están produciendo, esperando, en falla o sin OT. Pase el mouse sobre una luz para ver la máquina, su OT y lo que dice su pantalla. Si hace clic en ella, sigue su OT; con **Ver tarjetas** entra a la línea.
-- **Una línea:** las tarjetas completas solo de esa línea.
+- **Líneas:** **Todas**, **Línea 1 · 22**, **Línea 2 · 20** y **Línea 3 · 9**. Cada línea se prende y se apaga con un clic (la palomita ✓ indica que está prendida), así puede ver una sola o varias. Siempre queda al menos una prendida. **Todas** prende las tres. Al lado del título dice qué está viendo, por ejemplo "líneas 2 y 3".
+- **Ver como:**
+  - **Resumen:** una fila por línea con una luz por máquina, del color de su torreta (con rayas si está sin señal), y cuántas están produciendo, esperando, en falla o sin OT. Pase el mouse sobre una luz para ver la máquina, su OT y lo que dice su pantalla; si hace clic, sigue su OT. **Ver tarjetas** abre solo esa línea en tarjetas.
+  - **Tarjetas:** la pantalla completa de cada máquina de las líneas prendidas.
 
-Si sigue una OT mientras ve una línea, el panel salta a la línea de esa OT. Las estaciones de la derecha siempre se ven, porque las comparten las tres líneas. En los menús de fallas, señal y Terminal, las máquinas vienen agrupadas por línea.
+Si sigue una OT de una línea que tiene apagada, el panel la prende. Las estaciones de la derecha siempre se ven, porque las comparten las tres líneas. En los menús de fallas, señal y Terminal, las máquinas vienen agrupadas por línea.
 
 **Inyectoras.** Cada tarjeta es la pantalla de una terminal. El color es el de su torreta Andon:
 
