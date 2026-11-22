@@ -82,3 +82,14 @@ export const LEYENDA_TRAMA = [
   ['var(--rol-prod)', 'Datos variables (etiqueta, largo, valor)'],
   ['var(--rol-pt)', 'Firma para detectar tramas falsas o alteradas'],
 ];
+
+// Llena un <select> con las inyectoras agrupadas por línea (y, si se pide, las estaciones compartidas al final)
+export function opcionesPorLinea(sel, nodos, { estaciones = false } = {}) {
+  const lineas = new Map();
+  for (const n of nodos.filter((x) => x.tipo === 'inyectora')) {
+    if (!lineas.has(n.linea)) lineas.set(n.linea, h('optgroup', { label: `Línea ${n.linea}` }));
+    lineas.get(n.linea).append(h('option', { value: n.nombre, text: n.nombre }));
+  }
+  sel.append(...lineas.values());
+  if (estaciones) sel.append(h('optgroup', { label: 'Estaciones compartidas' }, ...nodos.filter((x) => x.tipo !== 'inyectora').map((n) => h('option', { value: n.nombre, text: n.nombre }))));
+}

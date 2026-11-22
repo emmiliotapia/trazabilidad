@@ -343,7 +343,7 @@ export class MES extends EventEmitter {
           (SELECT COUNT(*) FROM bolsas b WHERE b.ot = o.ot) bolsas,
           (SELECT COUNT(*) FROM cajas c WHERE c.ot = o.ot AND c.estado <> 'EN_EMPAQUE') cajas,
           (SELECT COUNT(*) FROM cajas c WHERE c.ot = o.ot AND c.estado = 'DESPACHADA') despachadas
-        FROM ordenes_trabajo o ORDER BY o.ts_creacion DESC LIMIT 30`).all(),
+        FROM ordenes_trabajo o ORDER BY o.estado = 'COMPLETO', o.ts_creacion DESC LIMIT 80`).all(),
     };
   }
 

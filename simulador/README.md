@@ -15,7 +15,7 @@ npm start            # panel en http://localhost:8080 · MQTT en localhost:1883
 npm run prueba -- 120   # corre 120 s sin panel, a 40x, con fallas programadas, y muestra un resumen
 ```
 
-Variables útiles: `PUERTO_HTTP`, `PUERTO_MQTT`, `VELOCIDAD` (1 = tiempo real; por defecto 10), `INYECTORAS`, `BOLSAS_OT`, `INTERVALO_BOLSA` (ms), `PERDIDA` (0–0.9), `TASA_FALLAS`.
+Variables útiles: `PUERTO_HTTP`, `PUERTO_MQTT`, `VELOCIDAD` (1 = tiempo real; por defecto 10), `LINEAS` (por defecto `22,20,9`), `MESAS_SM1`, `PUESTOS_PT`, `OPERADORES_RESINA`, `BOLSAS_OT`, `INTERVALO_BOLSA` (ms), `PERDIDA` (0–0.9), `TASA_FALLAS`.
 
 El broker MQTT es real: se puede conectar MQTT Explorer o `mosquitto_sub -h localhost -t 'aseti/p1/#' -v` para ver el tráfico.
 
@@ -33,7 +33,7 @@ El broker MQTT es real: se puede conectar MQTT Explorer o `mosquitto_sub -h loca
 
 ## Qué se puede ver en el panel
 
-- **Planta:** la pantalla de cada terminal (22 inyectoras, MP, mezanina, 2 mesas de SM1 con la pantalla AV, PT y visión con la matriz o/x), los conteos por CP, las alertas y los controles.
+- **Planta:** la pantalla de cada terminal (51 inyectoras en 3 líneas con vista de toda la planta o por línea, MP, mezanina, 4 mesas de SM1 con la pantalla AV, 2 puestos de PT y visión con la matriz o/x), los conteos por CP, las alertas y los controles.
 - **Radio y MQTT:** una trama desarmada byte por byte junto al JSON que publica el puente, el registro del aire (colisiones, pérdidas, RSSI) y el tráfico del broker.
 - **Trazabilidad:** búsqueda por OT, bolsa, caja, tarima o lote de resina, con el árbol de genealogía y el historial de eventos.
 
@@ -50,6 +50,7 @@ Certificado inválido (CP 01), resina incorrecta (CP 04), operador no habilitado
 
 - 28 nodos con un solo canal: ocupación del aire cercana al 8 % y alrededor del 12 % de tramas con colisión. Los reintentos y la eliminación de duplicados en el MES (`UNIQUE(nodo, seq)`) absorbieron las colisiones sin perder ningún evento.
 - Con una sola mesa en SM1, la estación se saturaba con 22 inyectoras; con dos mesas el flujo se mantiene. **Dato a validar con la planta.**
+- Con 3 líneas (51 inyectoras) hacen falta 3 operadores de resina, 4 mesas de SM1 y 2 puestos de PT, y repartir las estaciones en 3 canales LoRa: ningún canal pasa de ~10 % y las colisiones quedan en ~8 %. **Supuestos a validar con la planta.**
 - Todas las fallas programadas se detectaron, incluida la charola que llegó a SM1 sin CP 10 (detectada por el gate central).
 
 ## Despliegue en servidor

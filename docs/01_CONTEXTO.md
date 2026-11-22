@@ -5,7 +5,7 @@
 
 ## Resumen en una línea
 
-Sistema de trazabilidad y control de producción para una planta de inyección de plástico de hasta **22 inyectoras**: en cada checkpoint (CP 01–CP 16) se escanea un código y el sistema valida al momento si el material, la bolsa, la caja o la tarima es la correcta. La comunicación de piso es por **LoRa** (no se puede cablear y el WiFi tiene interferencia) y se traduce a **MQTT** en el servidor.
+Sistema de trazabilidad y control de producción para una planta de inyección de plástico con **51 inyectoras en 3 líneas** (L1: 22, L2: 20, L3: 9) que comparten almacenes, mezanina, SM1, PT y embarque: en cada checkpoint (CP 01–CP 16) se escanea un código y el sistema valida al momento si el material, la bolsa, la caja o la tarima es la correcta. La comunicación de piso es por **LoRa** (no se puede cablear y el WiFi tiene interferencia) y se traduce a **MQTT** en el servidor.
 
 ## Objetivo
 
@@ -66,7 +66,7 @@ Lote de resina MP → OT → Bolsa correlativa (1..n) → Caja UID → Tarima �
 | 07 | Moldeo, pesaje y embolsado | Operador de inyección | Llenado de bolsa, pesaje en báscula o conteo, cierre y etiqueta correlativa (1..n) | CP 06 = PASS + peso/conteo en tolerancia + secuencia sin saltos | OT, ID_Bolsa_Correlativo (k/n), Peso_o_Piezas_Bolsa, ID_Operador, Timestamp | Ajuste de tara/conteo / scrap de bolsa |
 | 08 | Inspección visual TEP 1 | Inspector de Calidad 1 | Muestreo de bolsas en charolas; revisión de rebaba, rechupes, tiros cortos, quemaduras; **sello físico** en la etiqueta de cada bolsa aprobada | CP 07 = PASS + 0 defectos críticos en la muestra | OT, ID_Bolsa_Inspeccionada, Estatus_Visual, ID_Inspector_1, Timestamp | Retención en celda / cuarentena TEP / scrap o retrabajo |
 | 09 | Liberación de charolas | Supervisor de producción | Revisión de charolas con sellos del Inspector 1; autoriza el despeje para no saturar pasillos | CP 08 = PASS (sellos confirmados) + pasillo despejado | OT, Cantidad_Charolas_Liberadas, ID_Supervisor, Timestamp | Charola retenida / alerta de saturación |
-| 10 | Retiro y traslado a SM1 | Charolero | Retiro de charolas liberadas de cualquiera de las 22 inyectoras y traslado en carrito a SM1 | CP 09 = PASS | ID_Charolero, ID_Charola/Ruta, Timestamp | Charola regresa a su celda / verificar estatus |
+| 10 | Retiro y traslado a SM1 | Charolero | Retiro de charolas liberadas de cualquier inyectora de las 3 líneas y traslado en carrito a SM1 | CP 09 = PASS | ID_Charolero, ID_Charola/Ruta, Timestamp | Charola regresa a su celda / verificar estatus |
 
 ### Etapa 3 · Empaque secundario en SM1 (CP 11–12)
 
@@ -114,5 +114,6 @@ El diagrama original de la empresa (`referencias/diagrama_flujo_CP01-CP16.jpeg`)
 6. ¿SM1 y el área de pre-envío (cámara de CP 15) tienen red cableada o también dependen de LoRa?
 7. ¿Las básculas de CP 07 tienen salida de datos (RS-232/USB) o la lectura es manual?
 8. ¿Cuántas bolsas lleva una caja y cuántas cajas una tarima? ¿Es fijo por número de parte?
+9. Con 51 inyectoras: ¿cuántos operadores de resina en la mezanina, cuántas mesas en SM1 y cuántos puestos de paletizado en PT? La simulación supone 3, 4 y 2.
 
-**Resueltas el 2026-11-21:** número de inyectoras (22), significado de SM1 y AV, tipo de código (QR y código de barras), y que hay integración con ERP y WMS.
+**Resueltas el 2026-11-21:** 3 líneas de producción (22 + 20 + 9 = 51 inyectoras) con estaciones compartidas, nombre de las máquinas (`L1-INY-01`), significado de SM1 y AV, tipo de código (QR y código de barras), y que hay integración con ERP y WMS.

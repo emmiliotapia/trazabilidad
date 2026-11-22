@@ -16,7 +16,7 @@
     </div>
     <dl class="indicadores">
       <div><dt>Hora de planta</dt><dd id="k-reloj">—</dd></div>
-      <div><dt>Canal LoRa ocupado</dt><dd id="k-ocupacion">—</dd></div>
+      <div><dt>Canal LoRa más ocupado</dt><dd id="k-ocupacion">—</dd></div>
       <div><dt>Tramas con colisión</dt><dd id="k-colisiones">—</dd></div>
       <div><dt>Eventos en MES</dt><dd id="k-eventos">—</dd></div>
       <div><dt>Tarimas despachadas</dt><dd id="k-tarimas">—</dd></div>
@@ -48,8 +48,12 @@
       </div>
       <div class="planta">
         <div class="piso">
-          <h2>Inyectoras <span class="nota">pantalla de cada terminal</span></h2>
-          <div class="maquinas" id="maquinas"></div>
+          <div class="piso-cab">
+            <h2>Inyectoras</h2>
+            <div class="lineas" id="lineas" role="group" aria-label="Qué línea ver"></div>
+          </div>
+          <div class="resumen-lineas" id="resumen-lineas"></div>
+          <div class="maquinas" id="maquinas" data-ver="todas"></div>
           <div class="fila-baja">
             <section class="caja-panel alertas">
               <h2>Alertas <span class="nota" id="n-pendientes"></span></h2>
@@ -102,7 +106,7 @@
             <i class="l-rojo"></i><i class="l-ambar"></i><i class="l-verde"></i>
           </div>
           <div class="carcasa">
-            <div class="carcasa-cab"><span id="m-nombre">INY-01</span><span id="m-senal"></span></div>
+            <div class="carcasa-cab"><span id="m-nombre">L1-INY-01</span><span id="m-senal"></span></div>
             <div class="pantalla-oled" id="m-oled"><div id="m-l1">—</div><div id="m-l2">—</div></div>
             <div class="arranque" id="m-arranque" aria-label="Lecturas del arranque">
               <span data-k="gafete">Gafete</span><span data-k="ot">OT</span><span data-k="qr">QR</span>
@@ -195,7 +199,7 @@
           <h2>Aire LoRa</h2>
           <dl class="mini-stats" id="radio-stats"></dl>
           <table class="tabla" id="tabla-aire">
-            <thead><tr><th>Hora</th><th>Sentido</th><th>Nodo</th><th>Tipo</th><th>Bytes</th><th>ms aire</th><th>RSSI</th><th>Resultado</th></tr></thead>
+            <thead><tr><th>Hora</th><th>Sentido</th><th>Canal</th><th>Nodo</th><th>Tipo</th><th>Bytes</th><th>ms aire</th><th>RSSI</th><th>Resultado</th></tr></thead>
             <tbody></tbody>
           </table>
         </section>

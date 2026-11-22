@@ -40,13 +40,16 @@ export const normal = (media, desv) => {
 };
 
 // Cola de exclusión mutua para estaciones compartidas (SM1, almacén PT, cámara)
+// Fila de espera de una estación. Con varios puestos (personas o mesas), cada trabajo toma el puesto con menos fila.
 export class Turno {
-  constructor() {
-    this.cola = Promise.resolve();
+  constructor(puestos = 1) {
+    this.puestos = Array.from({ length: Math.max(1, puestos) }, () => ({ cola: Promise.resolve(), n: 0 }));
   }
   run(fn) {
-    const r = this.cola.then(fn);
-    this.cola = r.catch(() => {});
+    const p = this.puestos.reduce((a, b) => (b.n < a.n ? b : a));
+    p.n++;
+    const r = p.cola.then(fn);
+    p.cola = r.catch(() => {}).finally(() => p.n--);
     return r;
   }
 }

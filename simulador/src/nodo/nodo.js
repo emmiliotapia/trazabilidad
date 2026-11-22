@@ -8,8 +8,8 @@ import { codificar, decodificar, TIPO, FALLA, FALLA_NOMBRE, FALLA_TEXTO } from '
 import { azar } from '../reloj.js';
 
 export class Nodo {
-  constructor({ id, nombre, tipo, canal, reloj, clave, cfg, enlace }) {
-    Object.assign(this, { id, nombre, tipo, canal, reloj, clave, cfg });
+  constructor({ id, nombre, tipo, canal, canalLoRa = 1, reloj, clave, cfg, enlace }) {
+    Object.assign(this, { id, nombre, tipo, canal, canalLoRa, reloj, clave, cfg });
     this.enlace = enlace;
     this.seq = 0;
     this.cola = []; // eventos pendientes de ACK (en flash)
@@ -135,6 +135,8 @@ export class Nodo {
       id: this.id,
       nombre: this.nombre,
       tipo: this.tipo,
+      linea: this.linea ?? null,
+      canal: this.canalLoRa,
       pantalla: this.pantalla,
       bufer: this.cola.length,
       conEnlace: this.conEnlace,

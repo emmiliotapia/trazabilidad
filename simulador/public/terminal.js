@@ -1,6 +1,6 @@
 // Terminal interactiva: la persona usa una inyectora como operador (lector de códigos + báscula),
 // sigue misiones guiadas y ve el viaje de cada mensaje: terminal → aire LoRa → gateway → puente → MQTT → MES → ACK.
-import { $, h, segmentar, dibujarSegmentos, LEYENDA_TRAMA } from './comun.js';
+import { $, h, segmentar, dibujarSegmentos, LEYENDA_TRAMA, opcionesPorLinea } from './comun.js';
 
 const AIRE = { ok: 'recibida', colision: 'chocó con otra trama', perdida: 'perdida por ruido', sin_senal: 'sin señal' };
 const ESTADOS = {
@@ -15,7 +15,7 @@ const ESTADOS = {
 };
 
 let meta = null;
-let maquina = 'INY-01';
+let maquina = 'L1-INY-01';
 let info = null; // etiquetas y fase de la máquina (API)
 let vista = null; // última vista del nodo (SSE estado)
 let foco = null; // seq del escaneo que se anima
@@ -386,7 +386,8 @@ export function alMES(m) {
 
 export function alEstado(est) {
   if (!$('#m-maquina').options.length) {
-    for (const x of est.nodos.filter((y) => y.tipo === 'inyectora')) $('#m-maquina').append(h('option', { value: x.nombre, text: x.nombre }));
+    opcionesPorLinea($('#m-maquina'), est.nodos);
+    $('#m-maquina').value = maquina;
   }
   const n = est.nodos.find((x) => x.nombre === maquina);
   if (!n) return;

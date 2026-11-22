@@ -1,6 +1,6 @@
 # Proyecto de Trazabilidad · Inyección de plástico (documento consolidado)
 
-> Generado el 2026-11-21 17:47. Este archivo se arma a partir de docs/. No editarlo a mano.
+> Generado el 2026-11-21 18:12. Este archivo se arma a partir de docs/. No editarlo a mano.
 
 
 ---
@@ -12,7 +12,7 @@
 
 ## Resumen en una línea
 
-Sistema de trazabilidad y control de producción para una planta de inyección de plástico de hasta **22 inyectoras**: en cada checkpoint (CP 01–CP 16) se escanea un código y el sistema valida al momento si el material, la bolsa, la caja o la tarima es la correcta. La comunicación de piso es por **LoRa** (no se puede cablear y el WiFi tiene interferencia) y se traduce a **MQTT** en el servidor.
+Sistema de trazabilidad y control de producción para una planta de inyección de plástico con **51 inyectoras en 3 líneas** (L1: 22, L2: 20, L3: 9) que comparten almacenes, mezanina, SM1, PT y embarque: en cada checkpoint (CP 01–CP 16) se escanea un código y el sistema valida al momento si el material, la bolsa, la caja o la tarima es la correcta. La comunicación de piso es por **LoRa** (no se puede cablear y el WiFi tiene interferencia) y se traduce a **MQTT** en el servidor.
 
 ## Objetivo
 
@@ -73,7 +73,7 @@ Lote de resina MP → OT → Bolsa correlativa (1..n) → Caja UID → Tarima �
 | 07 | Moldeo, pesaje y embolsado | Operador de inyección | Llenado de bolsa, pesaje en báscula o conteo, cierre y etiqueta correlativa (1..n) | CP 06 = PASS + peso/conteo en tolerancia + secuencia sin saltos | OT, ID_Bolsa_Correlativo (k/n), Peso_o_Piezas_Bolsa, ID_Operador, Timestamp | Ajuste de tara/conteo / scrap de bolsa |
 | 08 | Inspección visual TEP 1 | Inspector de Calidad 1 | Muestreo de bolsas en charolas; revisión de rebaba, rechupes, tiros cortos, quemaduras; **sello físico** en la etiqueta de cada bolsa aprobada | CP 07 = PASS + 0 defectos críticos en la muestra | OT, ID_Bolsa_Inspeccionada, Estatus_Visual, ID_Inspector_1, Timestamp | Retención en celda / cuarentena TEP / scrap o retrabajo |
 | 09 | Liberación de charolas | Supervisor de producción | Revisión de charolas con sellos del Inspector 1; autoriza el despeje para no saturar pasillos | CP 08 = PASS (sellos confirmados) + pasillo despejado | OT, Cantidad_Charolas_Liberadas, ID_Supervisor, Timestamp | Charola retenida / alerta de saturación |
-| 10 | Retiro y traslado a SM1 | Charolero | Retiro de charolas liberadas de cualquiera de las 22 inyectoras y traslado en carrito a SM1 | CP 09 = PASS | ID_Charolero, ID_Charola/Ruta, Timestamp | Charola regresa a su celda / verificar estatus |
+| 10 | Retiro y traslado a SM1 | Charolero | Retiro de charolas liberadas de cualquier inyectora de las 3 líneas y traslado en carrito a SM1 | CP 09 = PASS | ID_Charolero, ID_Charola/Ruta, Timestamp | Charola regresa a su celda / verificar estatus |
 
 ### Etapa 3 · Empaque secundario en SM1 (CP 11–12)
 
@@ -121,8 +121,9 @@ El diagrama original de la empresa (`referencias/diagrama_flujo_CP01-CP16.jpeg`)
 6. ¿SM1 y el área de pre-envío (cámara de CP 15) tienen red cableada o también dependen de LoRa?
 7. ¿Las básculas de CP 07 tienen salida de datos (RS-232/USB) o la lectura es manual?
 8. ¿Cuántas bolsas lleva una caja y cuántas cajas una tarima? ¿Es fijo por número de parte?
+9. Con 51 inyectoras: ¿cuántos operadores de resina en la mezanina, cuántas mesas en SM1 y cuántos puestos de paletizado en PT? La simulación supone 3, 4 y 2.
 
-**Resueltas el 2026-11-21:** número de inyectoras (22), significado de SM1 y AV, tipo de código (QR y código de barras), y que hay integración con ERP y WMS.
+**Resueltas el 2026-11-21:** 3 líneas de producción (22 + 20 + 9 = 51 inyectoras) con estaciones compartidas, nombre de las máquinas (`L1-INY-01`), significado de SM1 y AV, tipo de código (QR y código de barras), y que hay integración con ERP y WMS.
 
 
 ---
@@ -194,7 +195,7 @@ La regla de fondo: **LoRa solo lleva mensajes cortos entre los nodos y el gatewa
 | Canales | 1 (un solo canal y SF fijo) | 8 simultáneos (US915, sub-banda 2) |
 | Seguridad | Hay que agregarla (cifrado/firma propios) | AES-128 incluido en el estándar |
 | Comandos al nodo (cambio de OT) | Directos e inmediatos | Requiere nodos Clase C (alimentados, sin problema aquí) |
-| Costo y complejidad | Bajo, ideal para la prueba de concepto | Mayor, pero más robusto para 22+ nodos |
+| Costo y complejidad | Bajo, ideal para la prueba de concepto | Mayor, pero más robusto para 51+ nodos |
 
 **Recomendación:** prueba de concepto con **A**. El formato de mensaje y los tópicos MQTT se diseñan iguales para los dos casos, así se puede pasar a **B** en producción sin tocar el backend.
 
@@ -254,9 +255,27 @@ La regla de fondo: **LoRa solo lleva mensajes cortos entre los nodos y el gatewa
 - **SM1 / pantalla AV (CP 11–12):** maneja muchos escaneos seguidos y una pantalla gráfica. Se propone un equipo local (PC o tablet industrial) con la lógica de la caja. Si SM1 no tiene red cableada, envía los eventos por un nodo LoRa como cualquier otra estación. PENDIENTE (pregunta 6 de `01_CONTEXTO.md`).
 - **Cámara cenital (CP 15):** el video no puede ir por LoRa. Se necesita un equipo local de visión junto a la cámara; por LoRa (o cable, si hay) solo sale el resultado (`o o x x`, 2/4, PASS/FAIL).
 
+### Tres líneas, un gateway, varios canales
+
+La planta tiene 3 líneas (L1: 22, L2: 20, L3: 9 inyectoras) que comparten MP, mezanina, SM1, PT y embarque. Se usa **un solo gateway** que escucha **varios canales a la vez**, y cada grupo de terminales transmite en el suyo:
+
+| Canal | Quién transmite |
+|---|---|
+| 1 | Línea 1 (L1-INY-01 a L1-INY-22) |
+| 2 | Línea 2 (L2-INY-01 a L2-INY-20) |
+| 3 | Línea 3 (L3-INY-01 a L3-INY-09) |
+| 4 | MP, mezanina, puestos de PT y cámara |
+| 5 y 6 | Mesas de SM1, repartidas (escanean las bolsas de todas las líneas) |
+
+Solo chocan dos mensajes que se cruzan en el mismo canal. El gateway contesta (ACK y comandos) en el canal de la terminal.
+
+**Implicación de hardware:** una Heltec LoRa32 tiene una sola radio y escucha un canal a la vez. Para varios canales simultáneos se necesita un gateway con concentrador de 8 canales (SX1302/SX1303), por ejemplo RAK7268 o un RAK2287 sobre Raspberry Pi. Ese gateway se puede usar con LoRaWAN (opción B) o reenviando las tramas crudas a nuestro puente; el formato de mensaje y los tópicos no cambian. La prueba de concepto con 2 placas sigue siendo la opción A. Ver D16.
+
+**Identificador de nodo:** línea × 100 + número de máquina (L2-INY-05 = 205). Estaciones compartidas en el 900: MP 901, mezanina 902, SM1 911–914, PT 921–922, visión 931.
+
 ## Capacidad estimada
 
-Con SF7 y 125 kHz, un mensaje de ~40 bytes ocupa el aire unos 80–100 ms. Con 22 inyectoras más las demás estaciones, y escaneos cada pocos segundos como máximo, la red usa una fracción pequeña del canal. Hay que medirlo en la prueba de campo, sobre todo hacia la mezanina (2do piso).
+Con SF7 y 125 kHz, un mensaje de ~40 bytes ocupa el aire unos 80–100 ms. En la simulación con 51 inyectoras y 1 bolsa cada 90 s por máquina, ningún canal pasa de ~10 % de ocupación y ~8 % de las tramas chocan (los reintentos lo absorben). Con un solo canal para todo, las colisiones subían a ~19 %. Hay que medirlo en la prueba de campo, sobre todo hacia la mezanina (2do piso).
 
 ## Riesgos técnicos
 
@@ -300,6 +319,10 @@ En `simulador/` está la arquitectura completa funcionando en software (ver `sim
 | D11 | 2026-11-21 | SM1 (pantalla AV) y la cámara de CP 15 usan un **equipo local**; por LoRa solo viajan los eventos y resultados | Propuesta | La pantalla gráfica y el video no caben en el ancho de banda de LoRa |
 | D12 | 2026-11-21 | Construir un **simulador** con la arquitectura real (protocolo, puente, MQTT, MES) antes del hardware | Aceptada | Permite probar protocolo, gates, capacidad del canal y genealogía; el puente y el MES se reutilizan |
 | D13 | 2026-11-21 | Gates en dos niveles: **local en el nodo** y **central en el MES** con conciliación de eventos atrasados | Propuesta | Algunos gates dependen de otra estación y los eventos pueden llegar desordenados por el búfer |
+| D14 | 2026-11-21 | **3 líneas de producción:** L1 con 22, L2 con 20 y L3 con 9 inyectoras (51). MP, mezanina, SM1, PT y embarque son **compartidos** | Aceptada | Información de la planta |
+| D15 | 2026-11-21 | Nombres `L1-INY-01`…; ID de nodo = línea × 100 + número; estaciones compartidas en el 900 | Aceptada | Con 51 máquinas los ID 30–51 de las estaciones chocaban con las inyectoras; así la línea se lee en el número |
+| D16 | 2026-11-21 | **Un solo gateway multicanal**: un canal por línea, otro para MP/mezanina/PT/cámara y dos para las mesas de SM1 | Propuesta | Separa el tráfico de cada línea; en simulación las colisiones bajan de ~19 % a ~8 %. Requiere gateway de 8 canales (SX1302), no una Heltec sola |
+| D17 | 2026-11-21 | Capacidad de estaciones compartidas en la simulación: 3 operadores de resina, 4 mesas SM1, 2 puestos de paletizado | Supuesto | Con 1 operador, 2 mesas y 1 puesto, 51 máquinas se quedaban esperando resina y la fila de pre-envío crecía. Validar con la planta (pregunta 9) |
 
 
 ---
@@ -308,6 +331,18 @@ En `simulador/` está la arquitectura completa funcionando en software (ver `sim
 
 > **Última actualización:** 2026-11-21
 > Lo más reciente va arriba.
+
+## 2026-11-21 (tres líneas)
+
+**Hecho**
+- La planta simulada ahora tiene 3 líneas: L1 con 22, L2 con 20 y L3 con 9 inyectoras (51), con estaciones compartidas. Máquinas `L1-INY-01`…, ID de nodo = línea × 100 + número, estaciones en el 900 (D14, D15).
+- Radio: un gateway multicanal; cada línea en su canal, estaciones compartidas en otro y las mesas de SM1 en dos más (D16). El panel muestra la ocupación de cada canal y la columna Canal en el aire LoRa.
+- Planta: botones Toda la planta / Línea 1 / 2 / 3. La vista de toda la planta resume cada línea con una luz por máquina; al seguir una OT se salta a su línea. Menús agrupados por línea.
+- Capacidad de estaciones compartidas ajustada para 51 máquinas: 3 operadores de resina, 4 mesas SM1, 2 puestos PT (D17, supuesto).
+
+**Pendiente**
+- Confirmar con la planta cuántos operadores de resina, mesas de SM1 y puestos de paletizado hay (pregunta 9 de `01_CONTEXTO.md`).
+- Elegir el gateway de 8 canales para producción (D16).
 
 ## 2026-11-21 (seguimiento de OT y tiempos)
 
@@ -427,7 +462,7 @@ Todas las tramas siguen este formato. Enteros en *big endian*.
 ```
 
 - **byte 0:** versión en los 4 bits altos (hoy `1`), tipo en los 4 bits bajos.
-- **id nodo:** `uint16`. Inyectoras 1–22, MP 30, mezanina 31, SM1 40–41, PT 50, visión 51.
+- **id nodo:** `uint16`. Inyectoras = línea × 100 + número (L1-INY-01 = 101, L2-INY-20 = 220, L3-INY-09 = 309). Estaciones compartidas: MP 901, mezanina 902, SM1 911–914, PT 921–922, visión 931.
 - **seq:** `uint16`, contador propio de cada nodo; identifica el mensaje para el ACK y para eliminar duplicados.
 - **firma:** primeros 4 bytes de `HMAC-SHA256(clave_del_nodo, cabecera + cuerpo)`. La clave del nodo es `HMAC-SHA256(clave_de_red, "nodo:<id>")`. Una trama con firma inválida se descarta y se publica en `.../gateway/rechazo`.
 
@@ -489,14 +524,14 @@ Cada campo es `[etiqueta u8][largo u8][valor]`. Un receptor ignora etiquetas que
 ### 3.5 Ejemplo: bolsa 1 de 12 (CP 07), 47 bytes
 
 ```
-11 00 0c 00 0a 07 00 6b 02 26 85 01 0b 4f 54 2d 32 36 31 31 2d 30 31 38 05 02 00 01 06 02 00 0c 07 02 09 60 02 05 45 31 30 33 34 xx xx xx xx
+11 00 70 00 0a 07 00 6b 02 26 85 01 0b 4f 54 2d 32 36 31 31 2d 30 31 38 05 02 00 01 06 02 00 0c 07 02 09 60 02 05 45 31 30 33 34 xx xx xx xx
 │  │     │     │  │  │           │                                   │           │           │           │                       └ firma
 │  │     │     │  │  │           └ ot = "OT-2611-018"                └ bolsa = 1 └ total = 12└ peso = 2400 g          └ operador = "E1034"
 │  │     │     │  │  └ ts
 │  │     │     │  └ resultado 0 = PASS
 │  │     │     └ cp = 7
 │  │     └ seq = 10
-│  └ nodo = 12 (INY-12)
+│  └ nodo = 112 (L1-INY-12)
 └ versión 1, tipo 1 (EVENTO)
 ```
 
@@ -535,11 +570,11 @@ Prefijo configurable; por defecto `aseti/p1`.
 | `aseti/p1/gateway/traza` | puente | 0 | Trama en hex + JSON traducido (diagnóstico) |
 | `aseti/p1/gateway/rechazo` | puente | 0 | Tramas con firma inválida o nodo desconocido |
 
-**Evento** (`.../nodo/INY-12/evento`):
+**Evento** (`.../nodo/L1-INY-12/evento`):
 
 ```json
 {
-  "nodo": "INY-12", "nodo_id": 12, "seq": 10, "cp": 7,
+  "nodo": "L1-INY-12", "nodo_id": 112, "seq": 10, "cp": 7,
   "resultado": "PASS", "codigo": "PASS",
   "ts_nodo": "2026-11-21T23:10:46.000Z", "ts_gateway": "2026-11-21T23:10:46.000Z",
   "diferido": false, "rssi": -79, "snr": 8.2,
@@ -547,7 +582,7 @@ Prefijo configurable; por defecto `aseti/p1`.
 }
 ```
 
-**Comando** (`.../nodo/INY-12/cmd`):
+**Comando** (`.../nodo/L1-INY-12/cmd`):
 
 ```json
 { "id": "6f1c…", "cmd": "CARGAR_OT", "datos": { "ot": "OT-2611-018", "skuProducto": "CONT-500-PE", "total": 12, "pesoNominal": 2400, "tolerancia": 40, "operadores": ["E1034", "E1035", "E1036"] } }
@@ -638,7 +673,11 @@ npm run prueba -- 120     # 120 s sin panel a 40x, con fallas programadas
 | `PUERTO_MQTT` | 1883 | Puerto del broker |
 | `PREFIJO_MQTT` | `aseti/p1` | Prefijo de tópicos |
 | `VELOCIDAD` | 10 | Factor de tiempo (1 = real) |
-| `INYECTORAS` | 22 | Número de inyectoras |
+| `LINEAS` | `22,20,9` | Inyectoras por línea, separadas por coma |
+| `INYECTORAS` | — | Atajo: una sola línea con ese número de inyectoras |
+| `OPERADORES_RESINA` | 3 | Cargas de resina en paralelo en la mezanina (CP 04) |
+| `MESAS_SM1` | 4 | Mesas de empaque en SM1 (CP 11–12), una terminal por mesa |
+| `PUESTOS_PT` | 2 | Puestos de paletizado en PT (CP 14), una terminal por puesto |
 | `BOLSAS_OT` | 12 | Bolsas por OT (múltiplo de 4) |
 | `INTERVALO_BOLSA` | 90000 | ms simulados entre bolsas por máquina |
 | `PERDIDA` | 0.02 | Probabilidad base de perder una trama por ruido |
@@ -661,6 +700,16 @@ Prueba sin panel de 120 s a 40× (≈ 80 min de planta), 28 nodos, fallas progra
 
 Hallazgo de capacidad: con una sola mesa en SM1 la estación se satura (supuesto: 1 bolsa cada 90 s por máquina). La simulación usa dos mesas. Hay que confirmar el ritmo real con la planta.
 
+**Con 3 líneas (51 inyectoras, 2026-11-21).** Tres corridas del panel a 40×:
+
+| Corrida | OT esperando resina | Tarimas por hora de planta | Canal más ocupado | Tramas con colisión |
+|---|---|---|---|---|
+| 1 operador de resina, 2 mesas SM1, 1 puesto PT (~1 h de planta) | 33–42 | ~15 | — | ~5 % |
+| 3 operadores, 4 mesas, 2 puestos; estaciones en un solo canal (~5 h) | 4–16 | ~45 | 24 % (estaciones) | ~19 % |
+| Igual, con las mesas de SM1 en dos canales propios (~3 h) | 2–12 | ~45 | ~10 % | ~8 % |
+
+Los números de operadores, mesas y puestos son supuestos (D17).
+
 ## 11. Paso a hardware
 
 1. **Firmware de la terminal (ESP32):** portar `Nodo` (seq, cola FIFO en flash, ACK, reintentos, reloj) y la clase de su estación (`NodoInyectora`, etc.). Codificar y decodificar con el formato de la sección 3. El método `escanear()` de `NodoInyectora` ya separa los códigos por formato como lo haría el firmware.
@@ -676,7 +725,7 @@ Hallazgo de capacidad: con una sola mesa en SM1 la estación se satura (supuesto
 - `seq` es de 16 bits: después de 65 535 eventos de un mismo nodo se repite y chocaría con `UNIQUE(nodo, seq)`. En producción agregar un contador de arranques o una ventana de tiempo a la llave.
 - El canal simulado no modela el *capture effect* (cuando una trama más fuerte sobrevive a una colisión); el resultado real será algo mejor.
 - La firma de 4 bytes detecta alteraciones y tramas ajenas, pero no evita que se reenvíe una trama vieja (*replay*). Mitigación prevista: rechazar `ts` fuera de una ventana y `seq` ya vistos.
-- Un solo gateway y un solo canal (opción A). Para producción evaluar LoRaWAN con gateway de 8 canales y ChirpStack (decisión D10).
+- El canal simulado supone un gateway de 8 canales que recibe todos a la vez y transmite sin bloquear la recepción. Un gateway real es *half-duplex*: mientras manda un ACK no escucha. Con 51 terminales conviene medirlo en campo (D16). La prueba de concepto con una Heltec como gateway (opción A) tiene un solo canal.
 - La pantalla AV de SM1 y la cámara de CP 15 se simulan como nodos LoRa; en planta usarán un equipo local (decisión D11).
 
 
@@ -690,7 +739,7 @@ Hallazgo de capacidad: con una sola mesa en SM1 la estación se satura (supuesto
 
 ## 1. ¿Qué es esto?
 
-Es una planta de inyección "de mentira" que funciona igual que funcionará la real: 22 inyectoras, almacén de materia prima, mezanina, dos mesas de SM1, almacén de producto terminado y la cámara de embarque. Cada estación tiene una terminal con lector de códigos que manda sus escaneos por radio (LoRa) a un servidor.
+Es una planta de inyección "de mentira" que funciona igual que funcionará la real: 51 inyectoras en tres líneas (L1: 22, L2: 20, L3: 9) que comparten el almacén de materia prima, la mezanina, cuatro mesas de SM1, dos puestos de producto terminado y la cámara de embarque. Cada estación tiene una terminal con lector de códigos que manda sus escaneos por radio (LoRa) a un servidor.
 
 Sirve para:
 
@@ -714,7 +763,7 @@ Cada vez que se inicia, la planta empieza vacía. Las primeras bolsas aparecen e
 
 | Indicador | Qué significa | Valor normal |
 |---|---|---|
-| Canal LoRa ocupado | Porcentaje del tiempo que alguna terminal está transmitiendo | Menos de 15 % |
+| Canal LoRa más ocupado | Porcentaje del tiempo que alguna terminal está transmitiendo, en el canal más cargado. Cada línea tiene su canal | Menos de 15 % |
 | Tramas con colisión | Mensajes que chocaron con otro y se reenviaron | Menos de 20 % |
 | Eventos en MES | Escaneos guardados en la base de datos | Sube sin parar |
 | Tarimas despachadas | Tarimas que pasaron CP 16 | Sube cada pocos minutos |
@@ -735,6 +784,13 @@ Cada vez que se inicia, la planta empieza vacía. Las primeras bolsas aparecen e
 
 Se actualiza solo cada 2 segundos. **Ver genealogía** abre su árbol completo en la pestaña Trazabilidad; **Dejar de seguir** quita el resaltado.
 
+**Líneas.** Junto al título "Inyectoras" están los botones **Toda la planta**, **Línea 1 · 22**, **Línea 2 · 20** y **Línea 3 · 9**. El panel recuerda cuál eligió.
+
+- **Toda la planta:** una fila por línea con una luz por máquina, del color de su torreta (con rayas si está sin señal), y cuántas están produciendo, esperando, en falla o sin OT. Pase el mouse sobre una luz para ver la máquina, su OT y lo que dice su pantalla. Si hace clic en ella, sigue su OT; con **Ver tarjetas** entra a la línea.
+- **Una línea:** las tarjetas completas solo de esa línea.
+
+Si sigue una OT mientras ve una línea, el panel salta a la línea de esa OT. Las estaciones de la derecha siempre se ven, porque las comparten las tres líneas. En los menús de fallas, señal y Terminal, las máquinas vienen agrupadas por línea.
+
 **Inyectoras.** Cada tarjeta es la pantalla de una terminal. El color es el de su torreta Andon:
 
 | Color | Significado |
@@ -746,7 +802,7 @@ Se actualiza solo cada 2 segundos. **Ver genealogía** abre su árbol completo e
 
 Si una tarjeta dice **sin señal** o muestra un número en **búfer**, la terminal está guardando mensajes en su memoria porque no alcanza al gateway. Los mandará cuando vuelva la señal.
 
-**Estaciones.** Almacén MP, mezanina, SM1 (con la pantalla AV de cada mesa), almacén PT y cámara de embarque.
+**Estaciones.** Almacén MP, mezanina, las mesas de SM1 (con la pantalla AV de cada una), los puestos de almacén PT y la cámara de embarque. Las comparten las tres líneas.
 
 **Alertas** (debajo de las inyectoras). Cada falla detectada, con la hora, el CP y la estación. "Pendientes" son reglas que el servidor está esperando confirmar porque falta un escaneo de otra estación.
 

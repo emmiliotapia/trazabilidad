@@ -65,7 +65,7 @@ La regla de fondo: **LoRa solo lleva mensajes cortos entre los nodos y el gatewa
 | Canales | 1 (un solo canal y SF fijo) | 8 simultáneos (US915, sub-banda 2) |
 | Seguridad | Hay que agregarla (cifrado/firma propios) | AES-128 incluido en el estándar |
 | Comandos al nodo (cambio de OT) | Directos e inmediatos | Requiere nodos Clase C (alimentados, sin problema aquí) |
-| Costo y complejidad | Bajo, ideal para la prueba de concepto | Mayor, pero más robusto para 22+ nodos |
+| Costo y complejidad | Bajo, ideal para la prueba de concepto | Mayor, pero más robusto para 51+ nodos |
 
 **Recomendación:** prueba de concepto con **A**. El formato de mensaje y los tópicos MQTT se diseñan iguales para los dos casos, así se puede pasar a **B** en producción sin tocar el backend.
 
@@ -125,9 +125,27 @@ La regla de fondo: **LoRa solo lleva mensajes cortos entre los nodos y el gatewa
 - **SM1 / pantalla AV (CP 11–12):** maneja muchos escaneos seguidos y una pantalla gráfica. Se propone un equipo local (PC o tablet industrial) con la lógica de la caja. Si SM1 no tiene red cableada, envía los eventos por un nodo LoRa como cualquier otra estación. PENDIENTE (pregunta 6 de `01_CONTEXTO.md`).
 - **Cámara cenital (CP 15):** el video no puede ir por LoRa. Se necesita un equipo local de visión junto a la cámara; por LoRa (o cable, si hay) solo sale el resultado (`o o x x`, 2/4, PASS/FAIL).
 
+### Tres líneas, un gateway, varios canales
+
+La planta tiene 3 líneas (L1: 22, L2: 20, L3: 9 inyectoras) que comparten MP, mezanina, SM1, PT y embarque. Se usa **un solo gateway** que escucha **varios canales a la vez**, y cada grupo de terminales transmite en el suyo:
+
+| Canal | Quién transmite |
+|---|---|
+| 1 | Línea 1 (L1-INY-01 a L1-INY-22) |
+| 2 | Línea 2 (L2-INY-01 a L2-INY-20) |
+| 3 | Línea 3 (L3-INY-01 a L3-INY-09) |
+| 4 | MP, mezanina, puestos de PT y cámara |
+| 5 y 6 | Mesas de SM1, repartidas (escanean las bolsas de todas las líneas) |
+
+Solo chocan dos mensajes que se cruzan en el mismo canal. El gateway contesta (ACK y comandos) en el canal de la terminal.
+
+**Implicación de hardware:** una Heltec LoRa32 tiene una sola radio y escucha un canal a la vez. Para varios canales simultáneos se necesita un gateway con concentrador de 8 canales (SX1302/SX1303), por ejemplo RAK7268 o un RAK2287 sobre Raspberry Pi. Ese gateway se puede usar con LoRaWAN (opción B) o reenviando las tramas crudas a nuestro puente; el formato de mensaje y los tópicos no cambian. La prueba de concepto con 2 placas sigue siendo la opción A. Ver D16.
+
+**Identificador de nodo:** línea × 100 + número de máquina (L2-INY-05 = 205). Estaciones compartidas en el 900: MP 901, mezanina 902, SM1 911–914, PT 921–922, visión 931.
+
 ## Capacidad estimada
 
-Con SF7 y 125 kHz, un mensaje de ~40 bytes ocupa el aire unos 80–100 ms. Con 22 inyectoras más las demás estaciones, y escaneos cada pocos segundos como máximo, la red usa una fracción pequeña del canal. Hay que medirlo en la prueba de campo, sobre todo hacia la mezanina (2do piso).
+Con SF7 y 125 kHz, un mensaje de ~40 bytes ocupa el aire unos 80–100 ms. En la simulación con 51 inyectoras y 1 bolsa cada 90 s por máquina, ningún canal pasa de ~10 % de ocupación y ~8 % de las tramas chocan (los reintentos lo absorben). Con un solo canal para todo, las colisiones subían a ~19 %. Hay que medirlo en la prueba de campo, sobre todo hacia la mezanina (2do piso).
 
 ## Riesgos técnicos
 

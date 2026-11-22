@@ -51,7 +51,7 @@ Todas las tramas siguen este formato. Enteros en *big endian*.
 ```
 
 - **byte 0:** versión en los 4 bits altos (hoy `1`), tipo en los 4 bits bajos.
-- **id nodo:** `uint16`. Inyectoras 1–22, MP 30, mezanina 31, SM1 40–41, PT 50, visión 51.
+- **id nodo:** `uint16`. Inyectoras = línea × 100 + número (L1-INY-01 = 101, L2-INY-20 = 220, L3-INY-09 = 309). Estaciones compartidas: MP 901, mezanina 902, SM1 911–914, PT 921–922, visión 931.
 - **seq:** `uint16`, contador propio de cada nodo; identifica el mensaje para el ACK y para eliminar duplicados.
 - **firma:** primeros 4 bytes de `HMAC-SHA256(clave_del_nodo, cabecera + cuerpo)`. La clave del nodo es `HMAC-SHA256(clave_de_red, "nodo:<id>")`. Una trama con firma inválida se descarta y se publica en `.../gateway/rechazo`.
 
@@ -113,14 +113,14 @@ Cada campo es `[etiqueta u8][largo u8][valor]`. Un receptor ignora etiquetas que
 ### 3.5 Ejemplo: bolsa 1 de 12 (CP 07), 47 bytes
 
 ```
-11 00 0c 00 0a 07 00 6b 02 26 85 01 0b 4f 54 2d 32 36 31 31 2d 30 31 38 05 02 00 01 06 02 00 0c 07 02 09 60 02 05 45 31 30 33 34 xx xx xx xx
+11 00 70 00 0a 07 00 6b 02 26 85 01 0b 4f 54 2d 32 36 31 31 2d 30 31 38 05 02 00 01 06 02 00 0c 07 02 09 60 02 05 45 31 30 33 34 xx xx xx xx
 │  │     │     │  │  │           │                                   │           │           │           │                       └ firma
 │  │     │     │  │  │           └ ot = "OT-2611-018"                └ bolsa = 1 └ total = 12└ peso = 2400 g          └ operador = "E1034"
 │  │     │     │  │  └ ts
 │  │     │     │  └ resultado 0 = PASS
 │  │     │     └ cp = 7
 │  │     └ seq = 10
-│  └ nodo = 12 (INY-12)
+│  └ nodo = 112 (L1-INY-12)
 └ versión 1, tipo 1 (EVENTO)
 ```
 
@@ -159,11 +159,11 @@ Prefijo configurable; por defecto `aseti/p1`.
 | `aseti/p1/gateway/traza` | puente | 0 | Trama en hex + JSON traducido (diagnóstico) |
 | `aseti/p1/gateway/rechazo` | puente | 0 | Tramas con firma inválida o nodo desconocido |
 
-**Evento** (`.../nodo/INY-12/evento`):
+**Evento** (`.../nodo/L1-INY-12/evento`):
 
 ```json
 {
-  "nodo": "INY-12", "nodo_id": 12, "seq": 10, "cp": 7,
+  "nodo": "L1-INY-12", "nodo_id": 112, "seq": 10, "cp": 7,
   "resultado": "PASS", "codigo": "PASS",
   "ts_nodo": "2026-11-21T23:10:46.000Z", "ts_gateway": "2026-11-21T23:10:46.000Z",
   "diferido": false, "rssi": -79, "snr": 8.2,
@@ -171,7 +171,7 @@ Prefijo configurable; por defecto `aseti/p1`.
 }
 ```
 
-**Comando** (`.../nodo/INY-12/cmd`):
+**Comando** (`.../nodo/L1-INY-12/cmd`):
 
 ```json
 { "id": "6f1c…", "cmd": "CARGAR_OT", "datos": { "ot": "OT-2611-018", "skuProducto": "CONT-500-PE", "total": 12, "pesoNominal": 2400, "tolerancia": 40, "operadores": ["E1034", "E1035", "E1036"] } }
@@ -262,7 +262,11 @@ npm run prueba -- 120     # 120 s sin panel a 40x, con fallas programadas
 | `PUERTO_MQTT` | 1883 | Puerto del broker |
 | `PREFIJO_MQTT` | `aseti/p1` | Prefijo de tópicos |
 | `VELOCIDAD` | 10 | Factor de tiempo (1 = real) |
-| `INYECTORAS` | 22 | Número de inyectoras |
+| `LINEAS` | `22,20,9` | Inyectoras por línea, separadas por coma |
+| `INYECTORAS` | — | Atajo: una sola línea con ese número de inyectoras |
+| `OPERADORES_RESINA` | 3 | Cargas de resina en paralelo en la mezanina (CP 04) |
+| `MESAS_SM1` | 4 | Mesas de empaque en SM1 (CP 11–12), una terminal por mesa |
+| `PUESTOS_PT` | 2 | Puestos de paletizado en PT (CP 14), una terminal por puesto |
 | `BOLSAS_OT` | 12 | Bolsas por OT (múltiplo de 4) |
 | `INTERVALO_BOLSA` | 90000 | ms simulados entre bolsas por máquina |
 | `PERDIDA` | 0.02 | Probabilidad base de perder una trama por ruido |
@@ -285,6 +289,16 @@ Prueba sin panel de 120 s a 40× (≈ 80 min de planta), 28 nodos, fallas progra
 
 Hallazgo de capacidad: con una sola mesa en SM1 la estación se satura (supuesto: 1 bolsa cada 90 s por máquina). La simulación usa dos mesas. Hay que confirmar el ritmo real con la planta.
 
+**Con 3 líneas (51 inyectoras, 2026-11-21).** Tres corridas del panel a 40×:
+
+| Corrida | OT esperando resina | Tarimas por hora de planta | Canal más ocupado | Tramas con colisión |
+|---|---|---|---|---|
+| 1 operador de resina, 2 mesas SM1, 1 puesto PT (~1 h de planta) | 33–42 | ~15 | — | ~5 % |
+| 3 operadores, 4 mesas, 2 puestos; estaciones en un solo canal (~5 h) | 4–16 | ~45 | 24 % (estaciones) | ~19 % |
+| Igual, con las mesas de SM1 en dos canales propios (~3 h) | 2–12 | ~45 | ~10 % | ~8 % |
+
+Los números de operadores, mesas y puestos son supuestos (D17).
+
 ## 11. Paso a hardware
 
 1. **Firmware de la terminal (ESP32):** portar `Nodo` (seq, cola FIFO en flash, ACK, reintentos, reloj) y la clase de su estación (`NodoInyectora`, etc.). Codificar y decodificar con el formato de la sección 3. El método `escanear()` de `NodoInyectora` ya separa los códigos por formato como lo haría el firmware.
@@ -300,5 +314,5 @@ Hallazgo de capacidad: con una sola mesa en SM1 la estación se satura (supuesto
 - `seq` es de 16 bits: después de 65 535 eventos de un mismo nodo se repite y chocaría con `UNIQUE(nodo, seq)`. En producción agregar un contador de arranques o una ventana de tiempo a la llave.
 - El canal simulado no modela el *capture effect* (cuando una trama más fuerte sobrevive a una colisión); el resultado real será algo mejor.
 - La firma de 4 bytes detecta alteraciones y tramas ajenas, pero no evita que se reenvíe una trama vieja (*replay*). Mitigación prevista: rechazar `ts` fuera de una ventana y `seq` ya vistos.
-- Un solo gateway y un solo canal (opción A). Para producción evaluar LoRaWAN con gateway de 8 canales y ChirpStack (decisión D10).
+- El canal simulado supone un gateway de 8 canales que recibe todos a la vez y transmite sin bloquear la recepción. Un gateway real es *half-duplex*: mientras manda un ACK no escucha. Con 51 terminales conviene medirlo en campo (D16). La prueba de concepto con una Heltec como gateway (opción A) tiene un solo canal.
 - La pantalla AV de SM1 y la cámara de CP 15 se simulan como nodos LoRa; en planta usarán un equipo local (decisión D11).

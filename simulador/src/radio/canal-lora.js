@@ -1,4 +1,6 @@
-// Canal LoRa simulado (un solo canal, sin "capture effect").
+// Radio LoRa simulada con un gateway multicanal (tipo SX1302: escucha varios canales a la vez).
+// Cada nodo transmite en su canal; solo chocan dos tramas que se cruzan en el MISMO canal.
+// Sin "capture effect".
 // Reemplazo real: la radio SX127x/SX126x del nodo y del gateway. El puente solo usa
 // registrarGateway() y transmitir('gw', ...), así que cambiar este archivo por un
 // lector de puerto serie del gateway Heltec no toca el resto del sistema.
@@ -27,7 +29,7 @@ export class CanalLoRa extends EventEmitter {
     this.enlaces = new Map();
     this.gateway = null;
     this.sinSenal = new Map(); // nodoId → hasta (ms simulados)
-    this.aire = []; // [fin, ms] para calcular ocupación del canal
+    this.aire = []; // [fin, ms, canal] para calcular ocupación por canal
     this.stats = { tramas: 0, ok: 0, colisiones: 0, perdidas: 0, sinSenal: 0, bytes: 0, subida: 0, bajada: 0 };
   }
 
@@ -54,18 +56,23 @@ export class CanalLoRa extends EventEmitter {
     return false;
   }
 
+  canalDe(nodoId) {
+    return this.nodos.get(nodoId)?.canalLoRa ?? 1;
+  }
+
   transmitir(origen, buf, destino) {
     const ahora = this.reloj.ahora();
     const ms = tiempoEnAire(buf.length, this.cfg);
-    const tx = { origen, destino, buf, inicio: ahora, fin: ahora + ms, ms, colision: false };
+    const canal = this.canalDe(origen === 'gw' ? destino : origen); // el gateway responde en el canal del nodo
+    const tx = { origen, destino, buf, canal, inicio: ahora, fin: ahora + ms, ms, colision: false };
     for (const otra of this.activas) {
-      if (otra.fin > ahora) {
+      if (otra.canal === canal && otra.fin > ahora) {
         otra.colision = true;
         tx.colision = true;
       }
     }
     this.activas.push(tx);
-    this.aire.push([tx.fin, ms]);
+    this.aire.push([tx.fin, ms, canal]);
     this.stats.tramas++;
     this.stats.bytes += buf.length;
     this.reloj.timeout(() => this.finalizar(tx), ms);
@@ -103,6 +110,7 @@ export class CanalLoRa extends EventEmitter {
       ts: this.reloj.iso(tx.fin),
       dir: subida ? 'subida' : 'bajada',
       nodo: this.nodos.get(nodoId)?.nombre ?? String(nodoId),
+      canal: tx.canal,
       tipo: TIPO_NOMBRE[cab?.tipo] ?? '?',
       seq: cab?.seq,
       seqAck: cab?.tipo === 3 && tx.buf.length >= 11 ? tx.buf.readUInt16BE(5) : undefined,
@@ -119,11 +127,18 @@ export class CanalLoRa extends EventEmitter {
     else this.nodos.get(tx.destino)?.recibir(tx.buf, { rssi, snr });
   }
 
-  // Porcentaje del último minuto (simulado) en que el canal estuvo ocupado
+  // Porcentaje del último minuto (simulado) en que estuvo ocupado el canal más cargado
   ocupacion() {
+    return Math.max(0, ...Object.values(this.ocupacionPorCanal()));
+  }
+
+  ocupacionPorCanal() {
     const ahora = this.reloj.ahora();
     this.aire = this.aire.filter(([fin]) => fin > ahora - 60000);
-    const ms = this.aire.reduce((s, [, m]) => s + m, 0);
-    return Math.min(1, ms / 60000);
+    const por = {};
+    for (const n of this.nodos.values()) por[n.canalLoRa ?? 1] ??= 0;
+    for (const [, m, c] of this.aire) por[c] = (por[c] ?? 0) + m;
+    for (const c in por) por[c] = Math.min(1, por[c] / 60000);
+    return por;
   }
 }

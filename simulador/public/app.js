@@ -1,5 +1,5 @@
 import * as manual from './terminal.js';
-import { $, h, hora, segmentar, dibujarSegmentos, LEYENDA_TRAMA } from './comun.js';
+import { $, h, hora, segmentar, dibujarSegmentos, LEYENDA_TRAMA, opcionesPorLinea } from './comun.js';
 
 // Panel del simulador. Recibe por SSE: estado (cada ~0.8 s), aire (cada trama LoRa),
 // traza (cada traducción del puente) y mqtt (cada mensaje del broker).
@@ -17,7 +17,7 @@ const ROL_ESTACION = {
 };
 
 let meta = null;
-const ui = { maquinas: new Map(), estaciones: new Map(), cpCuenta: new Map() };
+const ui = { maquinas: new Map(), estaciones: new Map(), cpCuenta: new Map(), luces: new Map() };
 
 // ───────────── franja de CP ─────────────
 function armarFlujo() {
@@ -69,10 +69,12 @@ function actualizarNodos(nodos) {
         const t = terminal(n);
         t.el.title = 'Clic para seguir la OT de esta máquina';
         t.el.onclick = () => t.ot && seguirOT(t.ot);
+        t.el.dataset.linea = n.linea;
+        t.linea = n.linea;
         ui.maquinas.set(n.nombre, t);
         $('#maquinas').append(t.el);
       }
-      ui.maquinas.get(n.nombre).ot = n.ot;
+      Object.assign(ui.maquinas.get(n.nombre), { ot: n.ot, color: n.pantalla.color, l2: n.pantalla.l2, sinSenal: n.sinSenal });
       pintarTerminal(ui.maquinas.get(n.nombre), n);
       continue;
     }
@@ -107,6 +109,86 @@ function actualizarNodos(nodos) {
   }
 }
 
+// ───────────── líneas de producción ─────────────
+// "Toda la planta" muestra una fila por línea con una luz por máquina (el color de su torreta);
+// al elegir una línea se ven las tarjetas completas solo de esa línea.
+// Quién transmite en cada canal: "línea 2" o los nombres de las estaciones compartidas
+function nombreCanal(c, e) {
+  if (Number(c) <= (e.lineas?.length ?? 0)) return `línea ${c}`;
+  return e.nodos.filter((n) => n.canal === Number(c)).map((n) => n.nombre).join(', ');
+}
+let verLinea = localStorage.getItem('ver-linea') || 'todas';
+
+function armarLineas(lineas) {
+  if (!lineas?.length) return;
+  if (verLinea !== 'todas' && !(Number(verLinea) <= lineas.length)) verLinea = 'todas';
+  const boton = (valor, texto) => {
+    const b = h('button', { type: 'button', 'data-ver': valor, text: texto });
+    b.onclick = () => elegirLinea(valor);
+    return b;
+  };
+  $('#lineas').replaceChildren(boton('todas', 'Toda la planta'), ...lineas.map((n, i) => boton(String(i + 1), `Línea ${i + 1} · ${n}`)));
+  elegirLinea(verLinea);
+}
+
+function elegirLinea(valor) {
+  verLinea = String(valor);
+  localStorage.setItem('ver-linea', verLinea);
+  $('#maquinas').dataset.ver = verLinea;
+  $('#resumen-lineas').hidden = verLinea !== 'todas';
+  for (const b of $('#lineas').children) b.setAttribute('aria-pressed', String(b.dataset.ver === verLinea));
+}
+
+const lineaDe = (maquina) => Number(/^L(\d+)-/.exec(maquina ?? '')?.[1]) || null;
+
+function actualizarResumenLineas(e) {
+  const cont = $('#resumen-lineas');
+  if (!e.lineas?.length) return;
+  if (!ui.filasLinea) {
+    ui.filasLinea = e.lineas.map((n, i) => {
+      const linea = i + 1;
+      const luces = h('div', { class: 'luces' });
+      const cuentas = h('p', { class: 'cuentas' });
+      const fila = h('section', { class: 'fila-linea' },
+        h('header', {}, h('h3', { text: `Línea ${linea}` }), h('span', { class: 'nota', text: `${n} inyectoras · canal LoRa ${linea}` }),
+          h('button', { type: 'button', class: 'btn secundario', text: 'Ver tarjetas', onclick: () => elegirLinea(linea) })),
+        luces, cuentas);
+      cont.append(fila);
+      return { linea, luces, cuentas, puntos: new Map() };
+    });
+  }
+  const otsLinea = new Map();
+  for (const o of e.mes.otsRecientes) if (o.estado !== 'COMPLETO') otsLinea.set(lineaDe(o.id_maquina), (otsLinea.get(lineaDe(o.id_maquina)) ?? 0) + 1);
+  for (const f of ui.filasLinea) {
+    const c = { verde: 0, ambar: 0, rojo: 0, gris: 0 };
+    let sinSenal = 0;
+    for (const [nombre, t] of ui.maquinas) {
+      if (t.linea !== f.linea) continue;
+      let p = f.puntos.get(nombre);
+      if (!p) {
+        p = h('button', { type: 'button', class: 'luz' });
+        p.onclick = () => (t.ot ? seguirOT(t.ot) : elegirLinea(f.linea));
+        f.puntos.set(nombre, p);
+        ui.luces.set(nombre, p);
+        f.luces.append(p);
+      }
+      p.dataset.color = t.color;
+      p.classList.toggle('sin-senal', !!t.sinSenal);
+      p.textContent = nombre.slice(-2);
+      p.title = `${nombre} · ${t.ot ?? 'sin OT'} · ${t.l2 ?? ''}${t.sinSenal ? ' · sin señal' : ''}`;
+      c[t.color] = (c[t.color] ?? 0) + 1;
+      if (t.sinSenal) sinSenal++;
+    }
+    f.cuentas.replaceChildren(
+      h('span', { class: 'c verde', text: `${c.verde} produciendo` }),
+      h('span', { class: 'c ambar', text: `${c.ambar} esperando` }),
+      h('span', { class: `c rojo${c.rojo ? ' hay' : ''}`, text: `${c.rojo} en falla` }),
+      c.gris ? h('span', { class: 'c gris', text: `${c.gris} sin OT` }) : '',
+      sinSenal ? h('span', { class: 'c rojo hay', text: `${sinSenal} sin señal` }) : '',
+      h('span', { class: 'c', text: `${otsLinea.get(f.linea) ?? 0} OT abiertas` }));
+  }
+}
+
 // ───────────── alertas, bitácora, indicadores ─────────────
 function actualizarAlertas(mes) {
   const ul = $('#alertas');
@@ -134,13 +216,15 @@ function actualizarEstado(e) {
   }
   actualizarFlujo(e.mes.porCP);
   actualizarNodos(e.nodos);
+  actualizarResumenLineas(e);
   actualizarAlertas(e.mes);
   $('#bitacora').replaceChildren(...e.bitacora.map((b) => h('li', {}, h('time', { text: hora(b.ts) }), b.texto)));
   const r = e.radio, m = e.mes.stats, p = e.puente;
   $('#radio-stats').replaceChildren(...[
     ['Tramas', r.tramas], ['Correctas', r.ok], ['Colisiones', r.colisiones], ['Perdidas por ruido', r.perdidas], ['Sin señal', r.sinSenal],
     ['Publicadas en MQTT', p.publicadas], ['Duplicados descartados', m.duplicados], ['Eventos atrasados', m.diferidos], ['Conciliados', m.conciliados],
-  ].map(([k, v]) => h('div', {}, h('dt', { text: k }), h('dd', { text: v.toLocaleString('es-MX') }))));
+  ].map(([k, v]) => h('div', {}, h('dt', { text: k }), h('dd', { text: v.toLocaleString('es-MX') }))),
+    ...Object.entries(r.porCanal ?? {}).map(([c, v]) => h('div', {}, h('dt', { text: `Canal ${c} · ${nombreCanal(c, e)}` }), h('dd', { text: `${(v * 100).toFixed(1)} % ocupado` }))));
   const tb = $('#tabla-ots tbody');
   tb.replaceChildren(...e.mes.otsRecientes.map((o) => {
     const tr = h('tr', {}, h('td', { text: o.ot }), h('td', { text: o.id_maquina }), h('td', { text: o.sku_producto }),
@@ -161,6 +245,7 @@ const plantaVisible = () => !$('#vista-planta').hidden;
 
 function seguirOT(ot) {
   seguir.ot = ot || null;
+  seguir.cambio = true;
   seguir.g = null;
   $('#sel-ot').value = seguir.ot ?? '';
   $('#seguir-ver').hidden = !seguir.ot;
@@ -175,6 +260,12 @@ async function cargarSeguimiento() {
   const r = await fetch(`/api/genealogia?id=${encodeURIComponent(ot)}`);
   if (seguir.ot !== ot) return;
   seguir.g = r.ok ? await r.json() : null;
+  // Al elegir otra OT, si se está viendo una línea, se salta a la línea de su máquina
+  if (seguir.g && seguir.cambio) {
+    seguir.cambio = false;
+    const l = lineaDe(seguir.g.orden.id_maquina);
+    if (l && verLinea !== 'todas' && Number(verLinea) !== l) elegirLinea(l);
+  }
   aplicarSeguimiento();
 }
 
@@ -221,6 +312,7 @@ function aplicarSeguimiento() {
   for (const [nombre, t] of [...ui.maquinas, ...ui.estaciones]) {
     const cps = nodosOT.get(nombre);
     t.el.classList.toggle('ot-toca', !!cps);
+    ui.luces.get(nombre)?.classList.toggle('ot-toca', !!cps);
     t.el.classList.toggle('ot-aqui', !!ultimo && ultimo.nodo === nombre);
     // Las estaciones compartidas (MP, mezanina, SM1, PT, cámara) atienden a todas las OT:
     // la nota dice qué hizo esa estación con la OT seguida, para que no parezca otra orden
@@ -306,7 +398,7 @@ const ESTADO_AIRE = { ok: 'recibida', colision: 'colisión', perdida: 'perdida',
 function agregarAire(t) {
   const tb = $('#tabla-aire tbody');
   tb.prepend(h('tr', { class: t.estado },
-    h('td', { text: hora(t.ts) }), h('td', { text: t.dir === 'subida' ? '↑ subida' : '↓ bajada' }), h('td', { text: t.nodo }), h('td', { text: t.tipo }),
+    h('td', { text: hora(t.ts) }), h('td', { text: t.dir === 'subida' ? '↑ subida' : '↓ bajada' }), h('td', { text: t.canal ?? '' }), h('td', { text: t.nodo }), h('td', { text: t.tipo }),
     h('td', { text: t.bytes }), h('td', { text: t.airtimeMs }), h('td', { text: t.rssi }), h('td', { text: ESTADO_AIRE[t.estado] })));
   while (tb.children.length > 150) tb.lastChild.remove();
 }
@@ -402,10 +494,9 @@ es.addEventListener('estado', (e) => {
   const est = JSON.parse(e.data);
   if (!opcionesListas) {
     opcionesListas = true;
-    for (const n of est.nodos) {
-      if (n.tipo === 'inyectora') $('#sel-maquina').append(h('option', { value: n.nombre, text: n.nombre }));
-      $('#sel-nodo').append(h('option', { value: n.nombre, text: n.nombre }));
-    }
+    opcionesPorLinea($('#sel-maquina'), est.nodos);
+    opcionesPorLinea($('#sel-nodo'), est.nodos, { estaciones: true });
+    armarLineas(est.lineas);
     $('#int').value = est.intervaloBolsaMs / 1000;
     $('#int-out').textContent = `${est.intervaloBolsaMs / 1000} s`;
     $('#perd').value = Math.round(est.radio.perdidaBase * 100);

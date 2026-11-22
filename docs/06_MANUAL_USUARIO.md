@@ -6,7 +6,7 @@
 
 ## 1. ¿Qué es esto?
 
-Es una planta de inyección "de mentira" que funciona igual que funcionará la real: 22 inyectoras, almacén de materia prima, mezanina, dos mesas de SM1, almacén de producto terminado y la cámara de embarque. Cada estación tiene una terminal con lector de códigos que manda sus escaneos por radio (LoRa) a un servidor.
+Es una planta de inyección "de mentira" que funciona igual que funcionará la real: 51 inyectoras en tres líneas (L1: 22, L2: 20, L3: 9) que comparten el almacén de materia prima, la mezanina, cuatro mesas de SM1, dos puestos de producto terminado y la cámara de embarque. Cada estación tiene una terminal con lector de códigos que manda sus escaneos por radio (LoRa) a un servidor.
 
 Sirve para:
 
@@ -30,7 +30,7 @@ Cada vez que se inicia, la planta empieza vacía. Las primeras bolsas aparecen e
 
 | Indicador | Qué significa | Valor normal |
 |---|---|---|
-| Canal LoRa ocupado | Porcentaje del tiempo que alguna terminal está transmitiendo | Menos de 15 % |
+| Canal LoRa más ocupado | Porcentaje del tiempo que alguna terminal está transmitiendo, en el canal más cargado. Cada línea tiene su canal | Menos de 15 % |
 | Tramas con colisión | Mensajes que chocaron con otro y se reenviaron | Menos de 20 % |
 | Eventos en MES | Escaneos guardados en la base de datos | Sube sin parar |
 | Tarimas despachadas | Tarimas que pasaron CP 16 | Sube cada pocos minutos |
@@ -51,6 +51,13 @@ Cada vez que se inicia, la planta empieza vacía. Las primeras bolsas aparecen e
 
 Se actualiza solo cada 2 segundos. **Ver genealogía** abre su árbol completo en la pestaña Trazabilidad; **Dejar de seguir** quita el resaltado.
 
+**Líneas.** Junto al título "Inyectoras" están los botones **Toda la planta**, **Línea 1 · 22**, **Línea 2 · 20** y **Línea 3 · 9**. El panel recuerda cuál eligió.
+
+- **Toda la planta:** una fila por línea con una luz por máquina, del color de su torreta (con rayas si está sin señal), y cuántas están produciendo, esperando, en falla o sin OT. Pase el mouse sobre una luz para ver la máquina, su OT y lo que dice su pantalla. Si hace clic en ella, sigue su OT; con **Ver tarjetas** entra a la línea.
+- **Una línea:** las tarjetas completas solo de esa línea.
+
+Si sigue una OT mientras ve una línea, el panel salta a la línea de esa OT. Las estaciones de la derecha siempre se ven, porque las comparten las tres líneas. En los menús de fallas, señal y Terminal, las máquinas vienen agrupadas por línea.
+
 **Inyectoras.** Cada tarjeta es la pantalla de una terminal. El color es el de su torreta Andon:
 
 | Color | Significado |
@@ -62,7 +69,7 @@ Se actualiza solo cada 2 segundos. **Ver genealogía** abre su árbol completo e
 
 Si una tarjeta dice **sin señal** o muestra un número en **búfer**, la terminal está guardando mensajes en su memoria porque no alcanza al gateway. Los mandará cuando vuelva la señal.
 
-**Estaciones.** Almacén MP, mezanina, SM1 (con la pantalla AV de cada mesa), almacén PT y cámara de embarque.
+**Estaciones.** Almacén MP, mezanina, las mesas de SM1 (con la pantalla AV de cada una), los puestos de almacén PT y la cámara de embarque. Las comparten las tres líneas.
 
 **Alertas** (debajo de las inyectoras). Cada falla detectada, con la hora, el CP y la estación. "Pendientes" son reglas que el servidor está esperando confirmar porque falta un escaneo de otra estación.
 

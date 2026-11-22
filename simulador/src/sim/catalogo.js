@@ -12,7 +12,7 @@ export const PROVEEDORES = ['PROV-ALFA', 'PROV-BETA', 'PROV-GAMA'];
 // Personal (prefijo por rol)
 export const PERSONAL = {
   almacenMP: ['A301', 'A302'],
-  resina: ['R201', 'R202'],
+  resina: ['R201', 'R202', 'R203'],
   supervisores: ['S01', 'S02'],
   inspectores1: ['Q101', 'Q102'],
   inspector2: ['Q201', 'Q202'],

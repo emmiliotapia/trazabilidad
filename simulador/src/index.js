@@ -37,19 +37,27 @@ const mqttUrl = `mqtt://localhost:${cfg.mqtt.puerto}`;
 const canal = new CanalLoRa(reloj, cfg.lora);
 
 // 3 · Nodos (terminales de estación)
-const base = (id, nombre, rssi) => ({ id, nombre, canal, reloj, clave: claveNodo(cfg.claveRed, id), cfg: cfg.nodo, enlace: { rssi, snr: rssi > -100 ? 8 : 2 } });
+// ID de nodo: línea × 100 + número de máquina (L2-INY-05 = 205); estaciones compartidas en el 900.
+// Canal LoRa (gateway de 8 canales): uno por línea; MP, mezanina, PT y visión en el siguiente;
+// las mesas de SM1, que escanean las bolsas de todas las líneas, se reparten en otros dos.
+const lineas = cfg.produccion.lineas;
+const canalComun = lineas.length + 1;
+const base = (id, nombre, rssi, canalLoRa = canalComun) => ({ id, nombre, canal, canalLoRa, reloj, clave: claveNodo(cfg.claveRed, id), cfg: cfg.nodo, enlace: { rssi, snr: rssi > -100 ? 8 : 2 } });
 const nodos = {
-  inyectoras: Array.from({ length: cfg.produccion.inyectoras }, (_, i) => {
-    const nombre = `INY-${String(i + 1).padStart(2, '0')}`;
-    return new NodoInyectora({ ...base(i + 1, nombre, Math.round(azar(-108, -78))), porCharola: cfg.produccion.bolsasPorCaja });
-  }),
-  mp: new NodoAlmacenMP(base(30, 'MP-01', -95)),
-  mez: new NodoMezanina(base(31, 'MEZ-01', -113)), // 2do piso: la señal más débil
-  sm1: [new NodoSM1(base(40, 'SM1-01', -88)), new NodoSM1(base(41, 'SM1-02', -90))], // dos mesas con pantalla AV
-  pt: new NodoAlmacenPT(base(50, 'PT-01', -98)),
-  vis: new NodoVision(base(51, 'VIS-01', -101)),
+  inyectoras: lineas.flatMap((cuantas, l) => Array.from({ length: cuantas }, (_, i) => {
+    const nombre = `L${l + 1}-INY-${String(i + 1).padStart(2, '0')}`;
+    const n = new NodoInyectora({ ...base((l + 1) * 100 + i + 1, nombre, Math.round(azar(-108, -78)), l + 1), porCharola: cfg.produccion.bolsasPorCaja });
+    n.linea = l + 1;
+    return n;
+  })),
+  mp: new NodoAlmacenMP(base(901, 'MP-01', -95)),
+  mez: new NodoMezanina(base(902, 'MEZ-01', -113)), // 2do piso: la señal más débil
+  sm1: Array.from({ length: cfg.produccion.mesasSM1 }, (_, i) => new NodoSM1(base(911 + i, `SM1-${String(i + 1).padStart(2, '0')}`, -88 - (i % 3), canalComun + 1 + (i % 2)))), // mesas con pantalla AV
+  pts: Array.from({ length: cfg.produccion.puestosPT }, (_, i) => new NodoAlmacenPT(base(921 + i, `PT-${String(i + 1).padStart(2, '0')}`, -98 + (i % 2) * 3))),
+  vis: new NodoVision(base(931, 'VIS-01', -101)),
 };
-const lista = [...nodos.inyectoras, nodos.mp, nodos.mez, ...nodos.sm1, nodos.pt, nodos.vis];
+nodos.pt = nodos.pts[0]; // PT-01 también registra el ingreso a pre-envío (CP 13)
+const lista = [...nodos.inyectoras, nodos.mp, nodos.mez, ...nodos.sm1, ...nodos.pts, nodos.vis];
 
 // 4 · Puente LoRa ↔ MQTT
 const puente = new PuenteLoRaMQTT({ canal, reloj, mqttUrl, prefijo: cfg.mqtt.prefijo, claveRed: cfg.claveRed, nodos: lista });
@@ -64,7 +72,7 @@ const sim = new Simulacion({ reloj, mes, canal, nodos, cfg: cfg.produccion });
 
 if (modoPrueba) {
   for (const f of ['resina', 'operador', 'peso', 'bolsaAjena', 'duplicada', 'sinCinta', 'camara', 'saltoCP10']) sim.inyectar(f);
-  reloj.timeout(() => canal.cortarSenal(3, 15 * 60 * 1000), 5 * 60 * 1000);
+  reloj.timeout(() => canal.cortarSenal(nodos.inyectoras[2].id, 15 * 60 * 1000), 5 * 60 * 1000);
   sim.iniciar();
   console.log(`Prueba: ${duracionPrueba} s reales a ${reloj.velocidad}x (≈ ${Math.round((duracionPrueba * reloj.velocidad) / 60)} min simulados)…`);
   setTimeout(() => {
@@ -93,7 +101,7 @@ if (modoPrueba) {
   Panel:   http://localhost:${cfg.http.puerto}
   MQTT:    ${mqttUrl}   (tópicos ${cfg.mqtt.prefijo}/#)
   Base:    datos/trazabilidad.db
-  Nodos:   ${lista.length} (${cfg.produccion.inyectoras} inyectoras + MP, mezanina, 2 mesas SM1, PT, visión)
+  Nodos:   ${lista.length} (${cfg.produccion.lineas.map((n, i) => `L${i + 1}: ${n}`).join(', ')} inyectoras + MP, mezanina, ${nodos.sm1.length} mesas SM1, ${nodos.pts.length} puestos PT, visión)
   Ctrl+C para salir.
 `);
   const salir = () => {

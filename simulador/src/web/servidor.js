@@ -34,11 +34,12 @@ export async function iniciarWeb({ puerto, host, carpeta, mqttUrl, prefijo, relo
   mes.on('evento', (ev) => ev.seq != null && enviar('mes', { nodo: ev.nodo, seq: ev.seq, cp: ev.cp, resultado: ev.resultado, codigo: ev.codigo, diferido: ev.diferido }));
   mes.on('duplicado', (ev) => enviar('mes', { nodo: ev.nodo, seq: ev.seq, cp: ev.cp, duplicado: true }));
 
-  const todos = () => [...nodos.inyectoras, nodos.mp, nodos.mez, ...nodos.sm1, nodos.pt, nodos.vis];
+  const todos = () => [...nodos.inyectoras, nodos.mp, nodos.mez, ...nodos.sm1, ...nodos.pts, nodos.vis];
   const estado = () => ({
     reloj: reloj.iso(),
     velocidad: reloj.velocidad,
-    radio: { ...canal.stats, ocupacion: canal.ocupacion(), perdidaBase: canal.perdidaBase },
+    radio: { ...canal.stats, ocupacion: canal.ocupacion(), porCanal: canal.ocupacionPorCanal(), perdidaBase: canal.perdidaBase },
+    lineas: cfg.produccion.lineas,
     puente: puente.stats,
     nodos: todos().map((n) => n.vista()),
     mes: mes.resumen(),

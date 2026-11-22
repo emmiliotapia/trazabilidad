@@ -14,8 +14,11 @@ export class Simulacion {
     this.fallas = []; // fallas inyectadas desde el panel, se consumen una vez
     this.lotes = new Map(); // sku → { lote, kg }
     this.preparandoResina = new Map();
-    this.turnos = { mp: new Turno(), mez: new Turno(), ingresoPT: new Turno(), paletizado: new Turno(), vis: new Turno() };
+    this.turnos = { mp: new Turno(), mez: new Turno(cfg.operadoresResina), vis: new Turno() };
     this.mesas = nodos.sm1.map((nodo) => ({ nodo, turno: new Turno(), cola: 0 })); // mesas de SM1
+    // Cada puesto de PT es una zona de pre-envío con su terminal: la OT entra (CP 13) y se paletiza (CP 14)
+    // en la misma zona, porque el gate local de CP 14 solo conoce las cajas que esa terminal registró
+    this.puestosPT = nodos.pts.map((nodo, i) => ({ nodo, letra: 'ABCDEFGH'[i], ingreso: new Turno(), turno: new Turno() }));
     this.otsActivas = new Map(); // ot → producto
     this.maquinas = new Map(); // inyectora → OT en curso
     this.manual = new Set(); // inyectoras controladas desde el panel
@@ -152,7 +155,7 @@ export class Simulacion {
     const turnoMez = manual() ? (fn) => fn() : (fn) => this.turnos.mez.run(fn);
     await turnoMez(async () => {
       await this.esperar(manual() ? 5 : 60, manual() ? 15 : 150);
-      const embudo = `EMB-${nodo.nombre.slice(-2)}`;
+      const embudo = nodo.nombre.replace('INY', 'EMB');
       const operador = elegir(PERSONAL.resina);
       if (this.falla('resina', nodo.nombre)) {
         const otra = elegir(PRODUCTOS.filter((p) => p.skuResina !== producto.skuResina)).skuResina;
@@ -215,7 +218,7 @@ export class Simulacion {
     let gafete = elegir(st.operadores);
     let qr = nodo.qr;
     if (this.falla('operador', nodo.nombre)) gafete = 'E9999';
-    else if (this.falla('qr', nodo.nombre)) qr = `QR-INY-${String((st.num % this.nodos.inyectoras.length) + 1).padStart(2, '0')}`;
+    else if (this.falla('qr', nodo.nombre)) qr = this.vecina(nodo).qr;
     const r = nodo.arrancar({ gafete, ot: st.ot, qr });
     if (!r.ok) this.log(`CP06 ${nodo.nombre}: ${r.texto}.`);
   }
@@ -243,6 +246,16 @@ export class Simulacion {
   }
 
   // ───────────── modo manual (terminal virtual del panel) ─────────────
+  puestoPT(ot) {
+    return this.puestosPT[Number(ot.slice(-3)) % this.puestosPT.length];
+  }
+
+  // La máquina de al lado en la misma línea (para la falla de QR equivocado)
+  vecina(nodo) {
+    const misma = this.nodos.inyectoras.filter((n) => n.linea === nodo.linea);
+    return misma[(misma.indexOf(nodo) + 1) % misma.length];
+  }
+
   inyectora(nombre) {
     return this.nodos.inyectoras.find((n) => n.nombre === nombre);
   }
@@ -300,8 +313,8 @@ export class Simulacion {
     const nodo = this.inyectora(nombre);
     if (!nodo) return null;
     const st = this.maquinas.get(nombre);
-    const num = Number(nombre.slice(-2));
-    const vecina = `QR-INY-${String((num % this.nodos.inyectoras.length) + 1).padStart(2, '0')}`;
+    const num = this.nodos.inyectoras.indexOf(nodo) + 1;
+    const vecina = this.vecina(nodo).qr;
     const otraOT = [...this.otsActivas.keys()].find((o) => o !== nodo.ot);
     const grupos = [];
     grupos.push({ titulo: 'Gafetes', items: [...operadoresDe(num).map((g) => ({ codigo: g, nota: 'habilitado' })), { codigo: 'E9999', nota: 'no habilitado', malo: true }] });
@@ -412,22 +425,24 @@ export class Simulacion {
 
     // CP 13 · Pre-envío
     await this.esperar(60, 240);
-    await this.turnos.ingresoPT.run(async () => {
-      this.nodos.pt.ingresarCaja({ caja, ot, ubicacion: `PRE-${elegir(['A', 'B', 'C'])}${Math.ceil(azar(0, 9))}`, almacenista: elegir(PERSONAL.almacenPT) });
+    const zona = this.puestoPT(ot);
+    await zona.ingreso.run(async () => {
+      zona.nodo.ingresarCaja({ caja, ot, ubicacion: `PRE-${zona.letra}${Math.ceil(azar(0, 9))}`, almacenista: elegir(PERSONAL.almacenPT) });
       await this.esperar(3, 8);
     });
     return caja;
   }
 
   // ───────────── CP 14–16: tarima, visión y despacho ─────────────
-  // PT y la cámara atienden a las 22 inyectoras en fila: cada tarima debe tardar menos de lo que la planta
+  // PT y la cámara atienden a todas las inyectoras en fila: cada tarima debe tardar menos de lo que la planta
   // tarda en terminar otra OT (~1 por minuto), o la fila de pre-envío crece sin fin.
   async flujoTarima(ot, cajas, producto) {
     await this.esperar(120, 400);
     const tarima = this.mes.nuevaTarima();
     const orden = this.mes.nuevaOrdenEmbarque();
-    await this.turnos.paletizado.run(async () => {
-      const pt = this.nodos.pt;
+    const puesto = this.puestoPT(ot);
+    await puesto.turno.run(async () => {
+      const pt = puesto.nodo;
       pt.iniciarTarima({ tarima, orden, numeroParte: producto.sku, esperadas: cajas.length, almacenista: elegir(PERSONAL.almacenPT) });
       for (const caja of cajas) {
         await this.esperar(4, 8);
@@ -447,7 +462,7 @@ export class Simulacion {
     await this.turnos.vis.run(async () => {
       const vis = this.nodos.vis;
       for (let cara = 1; cara <= 4; cara++) {
-        await this.esperar(3, 6);
+        await this.esperar(2, 4);
         let r = vis.escanearCara({ tarima, cara, camaraOk: !this.falla('camara') });
         while (!r.ok) {
           this.log(`CP15 ${tarima} cara ${cara}: ${r.texto}. Semáforo ámbar, re-escaneo.`);
@@ -455,7 +470,7 @@ export class Simulacion {
           r = vis.escanearCara({ tarima, cara, camaraOk: true });
         }
       }
-      await this.esperar(8, 15);
+      await this.esperar(5, 10);
       vis.despachar({ tarima, puerta: `P-${Math.ceil(azar(0, 6))}` });
     });
     this.otsActivas.delete(ot);
