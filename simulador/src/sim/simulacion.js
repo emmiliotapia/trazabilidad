@@ -58,12 +58,14 @@ export class Simulacion {
   }
 
   // ───────────── CP 01–02: tener resina aprobada en la mezanina ─────────────
-  asegurarResina(sku, kg) {
+  // rapido: la máquina en modo manual no hace fila en almacén MP (si se acabó el lote, se le surte uno de inmediato)
+  asegurarResina(sku, kg, rapido = false) {
     const l = this.lotes.get(sku);
     if (l && l.kg >= kg) {
       l.kg -= kg;
       return Promise.resolve(l.lote);
     }
+    if (rapido) return this.recibirYSubirLote(sku, true).then(() => this.asegurarResina(sku, kg, true));
     if (!this.preparandoResina.has(sku)) {
       const p = this.turnos.mp
         .run(() => this.recibirYSubirLote(sku))
@@ -73,18 +75,23 @@ export class Simulacion {
     return this.preparandoResina.get(sku).then(() => this.asegurarResina(sku, kg));
   }
 
-  async recibirYSubirLote(sku) {
+  // Tiempos de las personas alrededor de la máquina: en modo manual van rápido para no hacer esperar a quien prueba
+  ritmo(nodo, [min, max]) {
+    return this.manual.has(nodo.nombre) ? [Math.min(5, min), Math.min(15, max)] : [min, max];
+  }
+
+  async recibirYSubirLote(sku, rapido = false) {
     const mp = this.nodos.mp;
     for (;;) {
       const lote = this.mes.nuevoLote();
       const certificado = !this.falla('certificado');
-      await this.esperar(60, 180);
+      await this.esperar(rapido ? 10 : 60, rapido ? 20 : 180);
       const r = mp.recibirLote({ lote, sku, proveedor: elegir(PROVEEDORES), kg: 500, certificado, almacenista: elegir(PERSONAL.almacenMP) });
       if (!r.ok) {
         this.log(`CP01 ${lote} rechazado: ${r.texto}. Se recibe otro lote.`);
         continue;
       }
-      await this.esperar(120, 300);
+      await this.esperar(rapido ? 10 : 120, rapido ? 20 : 300);
       mp.trasladar({ lote, ubicacion: 'MEZ-2P', almacenista: elegir(PERSONAL.almacenMP) });
       // el MES debe ver el lote en mezanina antes de programar (CP 03 depende de esto)
       while (!this.mes.loteEnMezanina(sku)) await this.reloj.esperar(5000);
@@ -120,7 +127,15 @@ export class Simulacion {
     const producto = elegir(PRODUCTOS);
     const total = this.cfg.bolsasPorOT;
     const manual = () => this.manual.has(nodo.nombre);
-    const lote = await this.asegurarResina(producto.skuResina, Math.ceil((total * producto.nominal) / 1000));
+    // Si toman el control mientras la máquina hace fila en almacén MP, se le surte de inmediato
+    const kg = Math.ceil((total * producto.nominal) / 1000);
+    let surtido = false;
+    const enFila = this.asegurarResina(producto.skuResina, kg, manual()).finally(() => (surtido = true));
+    const prioridad = (async () => {
+      while (!surtido && !manual()) await this.reloj.esperar(2000);
+      return surtido ? enFila : this.asegurarResina(producto.skuResina, kg, true);
+    })();
+    const lote = await Promise.race([enFila, prioridad]);
 
     // CP 03 · planificación
     const { ok, ot } = await this.mes.crearOT({ maquina: nodo.nombre, producto, total });
@@ -222,7 +237,7 @@ export class Simulacion {
     Promise.all(st.charolas.map((c) => c.caja))
       .then((cajas) => this.flujoTarima(st.ot, cajas, st.producto))
       .catch((e) => console.error(st.ot, e));
-    await this.esperar(30, 90);
+    await this.esperar(...this.ritmo(nodo, [30, 90]));
     await this.mes.cerrarOT(st.ot);
     st.fase = 'terminada';
   }
@@ -338,7 +353,7 @@ export class Simulacion {
 
   async recorrerCharola(nodo, ot, charola, ks, producto, avisarRetiro) {
     // CP 08 · Inspector 1
-    await this.esperar(30, 120);
+    await this.esperar(...this.ritmo(nodo, [30, 120]));
     const muestra = elegir(ks);
     const inspector = elegir(PERSONAL.inspectores1);
     let r = nodo.ot === ot ? nodo.inspeccionar({ k: muestra, inspector, defecto: this.falla('defecto', nodo.nombre) }) : { ok: true };
@@ -349,11 +364,11 @@ export class Simulacion {
     }
 
     // CP 09 · Supervisor libera
-    await this.esperar(30, 150);
+    await this.esperar(...this.ritmo(nodo, [30, 150]));
     if (nodo.ot === ot) nodo.liberarCharola({ charola, supervisor: elegir(PERSONAL.supervisores) });
 
     // CP 10 · Charolero retira
-    await this.esperar(60, 240);
+    await this.esperar(...this.ritmo(nodo, [60, 240]));
     const charolero = elegir(PERSONAL.charoleros);
     if (this.falla('saltoCP10', nodo.nombre)) this.log(`CP10 omitido: ${ot} charola ${charola} sale sin registro.`);
     else if (nodo.ot === ot) nodo.retirarCharola({ charola, charolero });
@@ -405,6 +420,8 @@ export class Simulacion {
   }
 
   // ───────────── CP 14–16: tarima, visión y despacho ─────────────
+  // PT y la cámara atienden a las 22 inyectoras en fila: cada tarima debe tardar menos de lo que la planta
+  // tarda en terminar otra OT (~1 por minuto), o la fila de pre-envío crece sin fin.
   async flujoTarima(ot, cajas, producto) {
     await this.esperar(120, 400);
     const tarima = this.mes.nuevaTarima();
@@ -413,7 +430,7 @@ export class Simulacion {
       const pt = this.nodos.pt;
       pt.iniciarTarima({ tarima, orden, numeroParte: producto.sku, esperadas: cajas.length, almacenista: elegir(PERSONAL.almacenPT) });
       for (const caja of cajas) {
-        await this.esperar(8, 15);
+        await this.esperar(4, 8);
         if (this.falla('skuAjeno')) {
           const otro = elegir(PRODUCTOS.filter((p) => p.sku !== producto.sku)).sku;
           const r = pt.agregarCaja({ caja: 'CJ-999999', numeroParte: otro });
@@ -422,7 +439,7 @@ export class Simulacion {
         }
         pt.agregarCaja({ caja, numeroParte: producto.sku });
       }
-      await this.esperar(30, 60); // flejado
+      await this.esperar(15, 30); // flejado
       pt.cerrarTarima();
     });
 
@@ -430,7 +447,7 @@ export class Simulacion {
     await this.turnos.vis.run(async () => {
       const vis = this.nodos.vis;
       for (let cara = 1; cara <= 4; cara++) {
-        await this.esperar(5, 12);
+        await this.esperar(3, 6);
         let r = vis.escanearCara({ tarima, cara, camaraOk: !this.falla('camara') });
         while (!r.ok) {
           this.log(`CP15 ${tarima} cara ${cara}: ${r.texto}. Semáforo ámbar, re-escaneo.`);
@@ -438,7 +455,7 @@ export class Simulacion {
           r = vis.escanearCara({ tarima, cara, camaraOk: true });
         }
       }
-      await this.esperar(15, 40);
+      await this.esperar(8, 15);
       vis.despachar({ tarima, puerta: `P-${Math.ceil(azar(0, 6))}` });
     });
     this.otsActivas.delete(ot);

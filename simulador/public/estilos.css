@@ -503,3 +503,6 @@ body.siguiendo .lista-alertas li:not(.ot-suya), body.siguiendo .bitacora li:not(
 .piso .fila-baja { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
 @media (max-width: 1400px) { .piso .fila-baja { grid-template-columns: 1fr; } }
 @media (prefers-reduced-motion: reduce) { .term.ot-aqui { animation: none; } }
+.ot-nota { margin-top: 0.35rem; padding: 0.15rem 0.4rem; border-radius: 4px; background: #f3f0fb; color: var(--sigue); font: 600 0.72rem var(--mono); }
+body:not(.siguiendo) .ot-nota { display: none; }
+.seguir-info .ahora { display: block; margin-top: 0.2rem; color: var(--tinta); font-weight: 600; }

@@ -44,9 +44,10 @@ Cada vez que se inicia, la planta empieza vacía. Las primeras bolsas aparecen e
 **Seguir una OT.** Arriba de las inyectoras. Elija una OT en la lista o haga clic en la tarjeta de una inyectora para seguir la OT que está produciendo. Todo lo que no tiene que ver con esa OT se atenúa y queda resaltado en morado:
 
 - En la línea de checkpoints, los CP por los que ya pasó (rayita morada; roja si hubo falla) y la marca **llegó hasta aquí** en el CP más avanzado. Una OT puede estar en varios CP a la vez: unas bolsas se siguen moldeando mientras otras ya están en caja.
-- Las estaciones que la han tocado (materia prima, mezanina, su inyectora, la mesa de SM1, PT, cámara). La que tuvo la última actividad parpadea.
+- Las estaciones que la han tocado (materia prima, mezanina, su inyectora, la mesa de SM1, PT, cámara). Las estaciones de la derecha son compartidas: atienden a todas las inyectoras, por eso se resaltan aunque no sean "de" esa máquina. Cada estación resaltada muestra una nota morada con los CP que hizo con esa OT (por ejemplo, `CP 11, 12` en SM1). La que tuvo la última actividad parpadea.
 - Sus alertas y sus líneas de la bitácora.
 - Un resumen: máquina, producto, bolsas, cajas, tarimas, fallas, hasta qué CP llegó y la última actividad.
+- **Ahora:** en palabras, en qué parte va y qué espera. Por ejemplo: "2 de 3 cajas en pre-envío… la tarima se arma cuando estén todas". Una OT se queda en pre-envío (CP 13) hasta que llegan **todas** sus cajas, porque la tarima se arma con la OT completa.
 
 Se actualiza solo cada 2 segundos. **Ver genealogía** abre su árbol completo en la pestaña Trazabilidad; **Dejar de seguir** quita el resaltado.
 

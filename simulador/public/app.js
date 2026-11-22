@@ -194,21 +194,23 @@ function aplicarSeguimiento() {
   const g = seguir.g?.orden?.ot === ot ? seguir.g : null;
   document.body.classList.toggle('siguiendo', !!ot);
   const estadoCP = new Map(); // cp → pass | fail
-  const nodosOT = new Set();
+  const nodosOT = new Map(); // nodo → Set de CP que hizo con esta OT
+  const tocar = (nodo, cp) => (nodosOT.get(nodo) ?? nodosOT.set(nodo, new Set()).get(nodo)).add(cp);
   let ultimo = null;
   if (g) {
     if (g.lotes.length) {
       estadoCP.set(1, 'pass');
       estadoCP.set(2, 'pass');
-      nodosOT.add('MP-01');
+      tocar('MP-01', 1);
+      tocar('MP-01', 2);
     }
     for (const e of g.eventos) {
       const previo = estadoCP.get(e.cp);
       estadoCP.set(e.cp, e.resultado === 'PASS' || previo === 'pass' ? 'pass' : 'fail');
-      nodosOT.add(e.nodo);
+      if (e.nodo !== 'MES') tocar(e.nodo, e.cp);
       ultimo = e;
     }
-    nodosOT.add(g.orden.id_maquina);
+    if (g.orden.id_maquina && !nodosOT.has(g.orden.id_maquina)) nodosOT.set(g.orden.id_maquina, new Set());
   }
   const masLejos = estadoCP.size ? Math.max(...estadoCP.keys()) : null;
   for (const [n, x] of ui.cpCuenta) {
@@ -217,8 +219,17 @@ function aplicarSeguimiento() {
     x.li.classList.toggle('ot-actual', masLejos === n);
   }
   for (const [nombre, t] of [...ui.maquinas, ...ui.estaciones]) {
-    t.el.classList.toggle('ot-toca', nodosOT.has(nombre));
+    const cps = nodosOT.get(nombre);
+    t.el.classList.toggle('ot-toca', !!cps);
     t.el.classList.toggle('ot-aqui', !!ultimo && ultimo.nodo === nombre);
+    // Las estaciones compartidas (MP, mezanina, SM1, PT, cámara) atienden a todas las OT:
+    // la nota dice qué hizo esa estación con la OT seguida, para que no parezca otra orden
+    t.nota ??= h('div', { class: 'ot-nota' });
+    if (cps?.size) {
+      const lista = [...cps].sort((a, b) => a - b).map((c) => String(c).padStart(2, '0'));
+      t.nota.textContent = `${ot}: CP ${lista.join(', ')}`;
+      if (!t.nota.isConnected) t.el.append(t.nota);
+    } else t.nota.remove();
   }
   for (const li of document.querySelectorAll('#alertas li')) li.classList.toggle('ot-suya', !!ot && li.dataset.ot === ot);
   for (const li of document.querySelectorAll('#bitacora li')) li.classList.toggle('ot-suya', !!ot && li.textContent.includes(ot));
@@ -241,7 +252,29 @@ function aplicarSeguimiento() {
     `${bolsas}/${o.total_bolsas} bolsas · ${g.cajas.length} cajas · ${tarimas} tarimas`,
     fallas ? h('span', { class: 'f', text: ` · ${fallas} ${fallas === 1 ? 'falla' : 'fallas'}` }) : '',
     masLejos ? h('span', { class: 'ultimo', text: ` · llegó hasta CP ${String(masLejos).padStart(2, '0')}` }) : '',
-    ultimo ? ` · última actividad: CP ${String(ultimo.cp).padStart(2, '0')} en ${ultimo.nodo} a las ${hora(ultimo.ts_nodo)}` : '');
+    ultimo ? ` · última actividad: CP ${String(ultimo.cp).padStart(2, '0')} en ${ultimo.nodo} a las ${hora(ultimo.ts_nodo)}` : '',
+    h('span', { class: 'ahora', text: `Ahora: ${dondeVa(g)}` }));
+}
+
+// En palabras: en qué parte del recorrido va la OT y qué está esperando
+function dondeVa(g) {
+  const o = g.orden;
+  if (o.estado === 'PROGRAMADA') return 'programada; espera que la mezanina cargue la resina (CP 04).';
+  if (o.estado === 'LIBERADA') return 'liberada; espera el arranque del operador en la máquina (CP 06).';
+  const hechas = new Set(g.eventos.filter((e) => e.cp === 7 && e.resultado === 'PASS').map((e) => e.ref ?? e.id)).size;
+  if (hechas < o.total_bolsas) return `moldeando en ${o.id_maquina}: ${hechas} de ${o.total_bolsas} bolsas registradas (CP 07).`;
+  const porCaja = g.cajas[0]?.capacidad || 4;
+  const esperadas = Math.ceil(o.total_bolsas / porCaja);
+  const enPT = g.cajas.filter((c) => ['EN_PT', 'EN_TARIMA', 'DESPACHADA'].includes(c.estado)).length;
+  if (enPT < esperadas) {
+    return `moldeo terminado; ${enPT} de ${esperadas} cajas en pre-envío (CP 13). Las demás siguen en inspección o en SM1. La tarima se arma cuando estén todas.`;
+  }
+  const t = g.cajas.find((c) => c.tarima)?.tarima;
+  if (!t) return `las ${esperadas} cajas están en pre-envío; en fila para armar la tarima (CP 14).`;
+  if (t.estado === 'ARMANDO') return `armando la tarima ${t.id_tarima} (CP 14).`;
+  if (t.estado === 'ARMADA') return `tarima ${t.id_tarima} flejada; en fila para la cámara de pre-envío (CP 15).`;
+  if (t.estado === 'VERIFICADA') return `tarima ${t.id_tarima} verificada por la cámara; espera despacho (CP 16).`;
+  return `despachada en la tarima ${t.id_tarima}${t.puerta ? ` por la puerta ${t.puerta}` : ''}. Recorrido completo.`;
 }
 
 $('#sel-ot').onchange = (e) => seguirOT(e.target.value);
