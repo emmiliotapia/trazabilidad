@@ -135,3 +135,7 @@ CREATE INDEX ix_eventos_ot ON eventos(ot);
 CREATE INDEX ix_eventos_ref ON eventos(ref);
 CREATE INDEX ix_bolsas_ot ON bolsas(ot, charola);
 CREATE INDEX ix_cajas_tarima ON cajas(id_tarima);
+-- Índices para las consultas del panel (resumen cada 800 ms)
+CREATE INDEX ix_eventos_cp_res ON eventos(cp, resultado);
+CREATE INDEX ix_cajas_ot_estado ON cajas(ot, estado);
+CREATE INDEX ix_ot_estado_ts ON ordenes_trabajo(estado, ts_creacion);
