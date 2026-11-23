@@ -12,6 +12,8 @@
 - El modo anterior queda como **Modo libre y misiones**, sin cambios.
 - `/api/manual/etiquetas` devuelve además fase, si la OT está solicitada, si la máquina arrancó, la bolsa siguiente, el total, bolsas por charola y el QR.
 - Manual de usuario, sección 5, reescrita.
+- **Barra de paros en vivo** bajo las pestañas: máquinas detenidas, rechazos recientes y nodos sin señal, con su CP, causa, tiempo y accesos a la planta y a la terminal. El CP y la máquina del paro se marcan en rojo.
+- Las fallas del recorrido se presentan como tarjetas con su efecto (detiene la máquina, rechaza la bolsa, guarda en memoria).
 
 **Pendiente**
 - Hacer que el QR dibujado sea un QR legible con el teléfono.

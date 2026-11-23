@@ -252,6 +252,7 @@ function actualizarEstado(e) {
   actualizarNodos(e.nodos);
   actualizarResumenLineas(e);
   actualizarAlertas(e.mes);
+  actualizarParos(e);
   $('#bitacora').replaceChildren(...e.bitacora.map((b) => h('li', {}, h('time', { text: hora(b.ts) }), b.texto)));
   const r = e.radio, m = e.mes.stats, p = e.puente;
   $('#radio-stats').replaceChildren(...[
@@ -551,3 +552,125 @@ es.addEventListener('traza', (e) => {
 });
 es.addEventListener('mes', (e) => manual.alMES(JSON.parse(e.data)));
 es.addEventListener('mqtt', (e) => agregarMQTT(JSON.parse(e.data)));
+
+// ───────────── paros en vivo ─────────────
+// Barra fija bajo las pestañas: dice en un vistazo dónde está detenido el proceso ahora mismo.
+// Máquinas bloqueadas y sin señal salen del estado de cada terminal; los rechazos, de las alertas
+// nuevas del MES (se muestran 20 s). La franja de CP y la máquina se marcan en rojo.
+const paros = { visto: new Map(), primeraVez: true, desde: new Map(), marcados: new Set() };
+const VIDA_RECHAZO_MS = 20000;
+
+function haceTexto(ms) {
+  const s = Math.max(0, Math.round(ms / 1000));
+  return s < 60 ? `hace ${s} s` : `hace ${Math.floor(s / 60)} min`;
+}
+
+function irATerminal(maquina) {
+  document.querySelector('[data-vista="terminal"]').click();
+  const sel = $('#m-maquina');
+  if (sel.value !== maquina) {
+    sel.value = maquina;
+    sel.dispatchEvent(new Event('change'));
+  }
+}
+
+function irAPlanta(paro) {
+  document.querySelector('[data-vista="planta"]').click();
+  if (paro.ot) seguirOT(paro.ot);
+  const t = ui.maquinas.get(paro.maquina);
+  if (t?.el && !t.el.hidden) t.el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function actualizarParos(est) {
+  const ahora = Date.now();
+  const porId = new Map(est.nodos.flatMap((n) => [[n.id, n], [n.nombre, n]]));
+  const activos = [];
+  const desdeDe = (clave) => {
+    if (!paros.desde.has(clave)) paros.desde.set(clave, ahora);
+    return paros.desde.get(clave);
+  };
+  const vigentes = new Set();
+  for (const n of est.nodos) {
+    if (n.bloqueado) {
+      const clave = `b:${n.nombre}`;
+      vigentes.add(clave);
+      activos.push({ clave, nivel: 'rojo', maquina: n.nombre, ot: n.ot, cp: 6, titulo: 'Máquina detenida', causa: n.pantalla?.l2 && n.pantalla.l2 !== 'BLOQUEADA' ? n.pantalla.l2 : 'Arranque inválido', arreglo: 'Necesita al supervisor', desde: desdeDe(clave) });
+    }
+    if (n.sinSenal) {
+      const clave = `s:${n.nombre}`;
+      vigentes.add(clave);
+      activos.push({ clave, nivel: 'ambar', maquina: n.nombre, ot: n.ot, cp: null, titulo: 'Sin señal LoRa', causa: n.bufer ? `${n.bufer} mensaje(s) guardados en su memoria` : 'Guardará los mensajes en su memoria', arreglo: 'Sigue produciendo; envía todo al volver la señal', desde: desdeDe(clave) });
+    }
+  }
+  for (const clave of paros.desde.keys()) if (!vigentes.has(clave)) paros.desde.delete(clave);
+
+  // Rechazos recientes: las alertas que ya estaban al abrir la página no cuentan como nuevas
+  for (const a of est.mes.alertas) {
+    if (!paros.visto.has(a.id)) paros.visto.set(a.id, paros.primeraVez ? 0 : ahora);
+    const visto = paros.visto.get(a.id);
+    if (!visto || ahora - visto > VIDA_RECHAZO_MS || a.cp === 6) continue; // el CP 06 ya sale como máquina detenida
+    const nodo = porId.get(a.nodo);
+    const maquina = nodo?.nombre ?? (typeof a.nodo === 'string' ? a.nodo : `nodo ${a.nodo}`);
+    activos.push({ clave: `a:${a.id}`, nivel: a.nivel === 'rojo' ? 'rojo' : 'ambar', maquina, ot: a.ot, cp: a.cp, titulo: a.cp === 7 ? 'Bolsa rechazada' : `Rechazo en CP ${String(a.cp).padStart(2, '0')}`, causa: a.mensaje, arreglo: a.cp === 7 ? 'La máquina sigue; esa bolsa no cuenta' : a.origen === 'mes' ? 'Lo detectó el MES' : 'Lo detuvo la terminal', desde: visto, momentaneo: true, esMaquina: !!nodo && nodo.tipo === 'inyectora' });
+  }
+  paros.primeraVez = false;
+  if (paros.visto.size > 400) for (const [id, t] of paros.visto) if (ahora - t > VIDA_RECHAZO_MS * 3) paros.visto.delete(id);
+
+  activos.sort((a, b) => (a.nivel === b.nivel ? b.desde - a.desde : a.nivel === 'rojo' ? -1 : 1));
+  pintarParos(activos, ahora);
+  marcarParos(activos);
+}
+
+function pintarParos(activos, ahora) {
+  const caja = $('#paros');
+  const detenidas = activos.filter((p) => p.clave.startsWith('b:')).length;
+  const sinSenal = activos.filter((p) => p.clave.startsWith('s:')).length;
+  const rechazos = activos.filter((p) => p.momentaneo).length;
+  caja.dataset.nivel = detenidas ? 'rojo' : activos.length ? 'ambar' : 'ok';
+  const partes = [];
+  if (detenidas) partes.push(`${detenidas} ${detenidas === 1 ? 'máquina detenida' : 'máquinas detenidas'}`);
+  if (rechazos) partes.push(`${rechazos} ${rechazos === 1 ? 'rechazo' : 'rechazos'} en los últimos 20 s`);
+  if (sinSenal) partes.push(`${sinSenal} sin señal`);
+  const resumen = h('div', { class: 'paros-resumen' },
+    h('span', { class: 'paros-icono', 'aria-hidden': 'true', text: detenidas ? '■' : activos.length ? '▲' : '●' }),
+    h('strong', { text: activos.length ? partes.join(' · ') : 'Sin paros: el proceso fluye' }),
+    activos.length ? null : h('span', { class: 'paros-nota', text: 'Si una máquina se detiene o rechaza algo, aparece aquí al instante.' }));
+  const visibles = activos.slice(0, 4);
+  const lista = visibles.length
+    ? h('ul', { class: 'paros-lista' }, ...visibles.map((p) => {
+      const verPlanta = h('button', { type: 'button', class: 'btn-paro', text: 'Ver en planta' });
+      verPlanta.onclick = () => irAPlanta(p);
+      const abrir = h('button', { type: 'button', class: 'btn-paro', text: 'Abrir su terminal' });
+      abrir.onclick = () => irATerminal(p.maquina);
+      return h('li', { 'data-nivel': p.nivel },
+        h('span', { class: 'paro-cp', text: p.cp ? `CP ${String(p.cp).padStart(2, '0')}` : 'LoRa' }),
+        h('div', { class: 'paro-texto' },
+          h('b', { text: `${p.maquina} · ${p.titulo}` }),
+          h('span', { text: p.causa ?? '' }),
+          h('small', { text: `${haceTexto(ahora - p.desde)} · ${p.arreglo}${p.ot ? ` · ${p.ot}` : ''}` })),
+        h('div', { class: 'paro-acciones' }, verPlanta, p.esMaquina === false ? null : abrir));
+    }), activos.length > visibles.length ? h('li', { class: 'paros-mas', text: `y ${activos.length - visibles.length} más` }) : null)
+    : null;
+  caja.replaceChildren(resumen, lista ?? '');
+}
+
+// La franja de CP y la máquina se marcan donde está el paro
+function marcarParos(activos) {
+  const ahora = new Set();
+  for (const p of activos) {
+    if (p.cp) ahora.add(`cp:${p.cp}:${p.nivel}`);
+    ahora.add(`m:${p.maquina}:${p.nivel}`);
+  }
+  for (const k of paros.marcados) if (!ahora.has(k)) aplicarMarca(k, false);
+  for (const k of ahora) if (!paros.marcados.has(k)) aplicarMarca(k, true);
+  paros.marcados = ahora;
+}
+function aplicarMarca(k, si) {
+  const [tipo, id, nivel] = k.split(':');
+  const clase = `paro-${nivel}`;
+  if (tipo === 'cp') ui.cpCuenta.get(Number(id))?.li.classList.toggle(clase, si);
+  else {
+    ui.maquinas.get(id)?.el.classList.toggle(clase, si);
+    ui.luces.get(id)?.classList.toggle(clase, si);
+  }
+}

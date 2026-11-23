@@ -1013,16 +1013,16 @@ function opcionesError(paso) {
   const ops = [];
   const hay = (titulo, pred) => grupo(titulo).some((x) => x.malo && (!pred || pred(x)));
   if (!info.bloqueado && ['gafete', 'ot', 'qr'].includes(paso)) {
-    ops.push(['Gafete no habilitado', () => arranqueConError('gafete')]);
-    if (hay('Carpeta de la OT')) ops.push(['Carpeta de otra máquina', () => arranqueConError('ot')]);
-    ops.push(['QR de la máquina vecina', () => arranqueConError('qr')]);
+    ops.push(['Gafete no habilitado', () => arranqueConError('gafete'), 'Detiene la máquina', 'rojo']);
+    if (hay('Carpeta de la OT')) ops.push(['Carpeta de otra máquina', () => arranqueConError('ot'), 'Detiene la máquina', 'rojo']);
+    ops.push(['QR de la máquina vecina', () => arranqueConError('qr'), 'Detiene la máquina', 'rojo']);
   }
   if (['bolsa', 'charola', 'resto'].includes(paso) && info.bascula) {
-    ops.push(['Bolsa fuera de peso', () => bolsaConError('peso')]);
-    if (hay('Etiquetas correlativas del sobre', (x) => x.nota === 'se salta una')) ops.push(['Saltarse una etiqueta', () => bolsaConError('salto')]);
-    if (hay('Etiquetas correlativas del sobre', (x) => x.nota === 'de otra OT')) ops.push(['Etiqueta de otra OT', () => bolsaConError('ajena')]);
+    ops.push(['Bolsa fuera de peso', () => bolsaConError('peso'), 'Rechaza la bolsa', 'ambar']);
+    if (hay('Etiquetas correlativas del sobre', (x) => x.nota === 'se salta una')) ops.push(['Saltarse una etiqueta', () => bolsaConError('salto'), 'Rechaza la bolsa', 'ambar']);
+    if (hay('Etiquetas correlativas del sobre', (x) => x.nota === 'de otra OT')) ops.push(['Etiqueta de otra OT', () => bolsaConError('ajena'), 'Rechaza la bolsa', 'ambar']);
   }
-  if (['gafete', 'ot', 'qr', 'bolsa', 'charola', 'resto'].includes(paso)) ops.push([vista?.sinSenal ? 'Devolver la señal LoRa' : 'Cortar la señal LoRa', alternarSenal]);
+  if (['gafete', 'ot', 'qr', 'bolsa', 'charola', 'resto'].includes(paso)) ops.push(vista?.sinSenal ? ['Devolver la señal LoRa', alternarSenal, 'Reenvía lo guardado', 'verde'] : ['Cortar la señal LoRa', alternarSenal, 'Guarda en memoria', 'azul']);
   return ops;
 }
 
@@ -1034,9 +1034,11 @@ function pintarErrores(paso) {
   const caja = $('#r-errores');
   caja.hidden = !ops.length;
   caja.replaceChildren(
-    h('span', { text: 'Mostrar un error:' }),
-    ...ops.map(([texto, fn]) => {
-      const b = h('button', { type: 'button', class: 'btn-error', text: texto });
+    h('div', { class: 'fallas-cab' },
+      h('strong', { text: 'Simular una falla' }),
+      h('span', { text: 'Elija qué sale mal en este paso. La alerta aparece en la barra de paros, arriba, desde cualquier pestaña.' })),
+    ...ops.map(([texto, fn, efecto, tono]) => {
+      const b = h('button', { type: 'button', class: 'btn-error', 'data-tono': tono }, h('b', { text: texto }), h('small', { text: efecto }));
       b.onclick = async () => {
         if (R.ocupado) return;
         R.ocupado = true;

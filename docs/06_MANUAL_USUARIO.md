@@ -37,6 +37,8 @@ Cada vez que se inicia, la planta empieza vacía. Las primeras bolsas aparecen e
 
 **Velocidad.** 10× quiere decir que un minuto de planta dura 6 segundos. Bájela a 1× para verlo en tiempo real.
 
+**Barra de paros.** Justo debajo de las pestañas, visible en todas. En verde dice *Sin paros: el proceso fluye*. Si una máquina se detiene, rechaza algo o se queda sin señal, se pone roja o ámbar con un resumen y una tarjeta por paro: el checkpoint, la máquina, la causa, desde hace cuánto y qué se necesita para seguir. **Ver en planta** lleva a la máquina y resalta su OT; **Abrir su terminal** abre la pestaña Terminal con esa máquina. Las máquinas detenidas y sin señal se quedan hasta que se resuelven; los rechazos se muestran 20 segundos. El CP del paro también se marca en rojo en la línea de checkpoints.
+
 **Línea de checkpoints.** Debajo de las pestañas, los 16 CP en orden. Se iluminan cuando ocurre un escaneo en ese paso.
 
 ## 4. Pestaña Planta
@@ -142,7 +144,7 @@ Las charolas dibujadas debajo de la explicación muestran cuántas bolsas van y 
 
 ### 5.3 Mostrar errores
 
-Debajo del botón Siguiente, **Mostrar un error** ofrece los errores que aplican al paso actual. Cada uno hace mal el paso a propósito y explica, en una tarjeta, qué se hizo mal, qué mostró la terminal y cómo se corrige.
+Debajo del botón Siguiente, **Simular una falla** ofrece las fallas que aplican al paso actual; cada tarjeta dice lo que provoca (*Detiene la máquina*, *Rechaza la bolsa*, *Guarda en memoria*). Cada una hace mal el paso a propósito, aparece al instante en la barra de paros de arriba y explica, en una tarjeta, qué se hizo mal, qué mostró la terminal y cómo se corrige.
 
 | Error | Cuándo aparece | Qué pasa | Cómo se corrige |
 |---|---|---|---|

@@ -664,3 +664,54 @@ body.siguiendo .luz:not(.ot-toca) { opacity: 0.3; }
 .montaje, .montaje > *, .placa, .placa-cuerpo, .placa-centro { min-width: 0; }
 .placa .pantalla-oled div { white-space: normal; overflow-wrap: anywhere; }
 .placa .pantalla-oled { font-size: 0.9rem; }
+
+/* ───────────── paros en vivo ───────────── */
+.paros { margin: 0.5rem 1rem 0; border-radius: var(--r); border: 1px solid var(--linea); background: #fff; padding: 0.5rem 0.8rem; display: grid; gap: 0.5rem; }
+.paros[data-nivel='ok'] { background: #f1f8f3; border-color: #bfe0c9; }
+.paros[data-nivel='ambar'] { background: #fff8e6; border-color: #ecd38a; }
+.paros[data-nivel='rojo'] { background: #fdeeec; border-color: #ecaaa3; }
+.paros-resumen { display: flex; align-items: baseline; gap: 0.6rem; flex-wrap: wrap; }
+.paros-icono { font-size: 0.9rem; }
+.paros[data-nivel='ok'] .paros-icono { color: var(--verde); }
+.paros[data-nivel='ambar'] .paros-icono { color: #b07d00; }
+.paros[data-nivel='rojo'] .paros-icono { color: var(--rojo); }
+.paros[data-nivel='rojo'] .paros-resumen strong { color: var(--rojo); }
+.paros-nota { color: var(--tinta-2); font-size: 0.85rem; }
+.paros-lista { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(22rem, 1fr)); gap: 0.5rem; }
+.paros-lista li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 0.6rem; align-items: center; background: #fff; border: 1px solid var(--linea); border-radius: var(--r); padding: 0.45rem 0.6rem; }
+.paros-lista li[data-nivel='rojo'] { border-color: #e39a92; }
+.paros-lista li[data-nivel='ambar'] { border-color: #e6c66a; }
+.paros-lista li.paros-mas { display: block; border-style: dashed; color: var(--tinta-2); font-size: 0.85rem; }
+.paro-cp { font: 700 0.95rem var(--cond); padding: 0.3rem 0.45rem; border-radius: 4px; color: #fff; background: var(--rojo); white-space: nowrap; }
+li[data-nivel='ambar'] > .paro-cp { background: #b07d00; }
+.paro-texto { display: grid; gap: 1px; min-width: 0; font-size: 0.88rem; }
+.paro-texto b { font-size: 0.92rem; }
+.paro-texto small { color: var(--tinta-2); font-size: 0.78rem; }
+.paro-acciones { display: grid; gap: 4px; }
+.btn-paro { font: 600 0.78rem var(--sans); padding: 0.25rem 0.55rem; border-radius: var(--r); border: 1px solid var(--tinta); background: #fff; color: var(--tinta); cursor: pointer; white-space: nowrap; }
+.btn-paro:hover { background: var(--tinta); color: #fff; }
+
+/* dónde está el paro: franja de CP, tarjeta y luz de la máquina */
+.flujo li.paro-rojo { outline: 3px solid var(--rojo); outline-offset: -3px; animation: paro-latido 1.4s ease-in-out infinite; }
+.flujo li.paro-ambar { outline: 3px solid #d9a400; outline-offset: -3px; }
+.term.paro-rojo { outline: 3px solid var(--rojo); outline-offset: 2px; }
+.term.paro-ambar { outline: 3px solid #d9a400; outline-offset: 2px; }
+.luz.paro-rojo { outline: 2px solid var(--rojo); outline-offset: 2px; }
+.luz.paro-ambar { outline: 2px solid #d9a400; outline-offset: 2px; }
+@keyframes paro-latido { 50% { outline-color: rgba(200, 40, 30, 0.35); } }
+
+/* fallas para simular: tarjetas con su efecto */
+.rec-errores { display: grid; grid-template-columns: repeat(auto-fill, minmax(10.5rem, 1fr)); gap: 0.45rem; }
+.fallas-cab { grid-column: 1 / -1; display: grid; gap: 2px; }
+.fallas-cab strong { color: var(--tinta); font-size: 0.95rem; }
+.fallas-cab span { font-size: 0.84rem; }
+.btn-error { display: grid; gap: 2px; text-align: left; padding: 0.45rem 0.6rem; }
+.btn-error b { font-size: 0.86rem; }
+.btn-error small { font: 600 0.76rem var(--sans); }
+.btn-error[data-tono='ambar'] { border-color: #c99600; color: #7a5a00; }
+.btn-error[data-tono='ambar']:hover { background: #fff4d6; }
+.btn-error[data-tono='azul'] { border-color: #5470a8; color: #243a63; }
+.btn-error[data-tono='azul']:hover { background: #e7f1fb; }
+.btn-error[data-tono='verde'] { border-color: var(--verde); color: var(--verde); }
+.btn-error[data-tono='verde']:hover { background: #e6f4ea; }
+@media (prefers-reduced-motion: reduce) { .flujo li.paro-rojo { animation: none; } }
