@@ -332,6 +332,14 @@ export class Simulacion {
       maquina: nombre,
       manual: this.manual.has(nombre),
       fase: FASES[st?.fase] ?? 'sin OT',
+      // Para el recorrido guiado del panel: en qué paso exacto va la máquina
+      faseClave: st?.fase ?? null,
+      solicitada: this.solicitudOT.has(nombre),
+      arrancada: !!nodo.arrancada,
+      siguiente: nodo.cfgOT ? nodo.siguiente : null,
+      totalBolsas: nodo.cfgOT?.total ?? st?.total ?? null,
+      bolsasPorCharola: this.cfg.bolsasPorCaja,
+      qr: nodo.qr,
       puedePedirOT: this.manual.has(nombre) && (!st || st.fase === 'terminada') && !this.solicitudOT.has(nombre),
       otEnCurso: st?.ot ?? null,
       ayuda: !this.manual.has(nombre)

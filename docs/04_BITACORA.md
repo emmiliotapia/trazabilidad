@@ -1,7 +1,20 @@
 # 04 · Bitácora
 
-> **Última actualización:** 2026-11-21
+> **Última actualización:** 2026-11-23
 > Lo más reciente va arriba.
+
+## 2026-11-23 (terminal ESP32 y recorrido guiado)
+
+**Hecho**
+- La pestaña Terminal ahora dibuja la placa ESP32 LoRa (pantalla OLED con línea de señal y memoria, LED de transmisión, antena), el QR fijo de cada máquina, el lector GM65 y la báscula.
+- Nuevo modo **Recorrido guiado de una OT**: un botón Siguiente lleva la OT de la solicitud al despacho, muestra cómo se genera (CP 01–05 y ficha de la OT) y sigue la OT por la planta hasta CP 16. El paso actual se deduce del estado real de la máquina.
+- **Mostrar un error** en el recorrido: gafete no habilitado, carpeta de otra máquina, QR vecino (bloqueo y supervisor), bolsa fuera de peso, etiqueta saltada, etiqueta de otra OT (rechazo) y corte de señal LoRa.
+- El modo anterior queda como **Modo libre y misiones**, sin cambios.
+- `/api/manual/etiquetas` devuelve además fase, si la OT está solicitada, si la máquina arrancó, la bolsa siguiente, el total, bolsas por charola y el QR.
+- Manual de usuario, sección 5, reescrita.
+
+**Pendiente**
+- Hacer que el QR dibujado sea un QR legible con el teléfono.
 
 ## 2026-11-21 (tres líneas)
 

@@ -1,6 +1,6 @@
 # 06 · Manual de usuario del simulador
 
-> **Última actualización:** 2026-11-21
+> **Última actualización:** 2026-11-23
 > **Para:** supervisores, calidad, operadores y cualquier persona que quiera entender el sistema antes de instalarlo en planta.
 > **No necesita** saber programar. Para el detalle técnico vea [05_DOCUMENTACION_TECNICA.md](05_DOCUMENTACION_TECNICA.md).
 
@@ -11,7 +11,7 @@ Es una planta de inyección "de mentira" que funciona igual que funcionará la r
 Sirve para:
 
 - Ver cómo se registra cada paso (CP 01 a CP 16) y qué pasa cuando algo sale mal.
-- Ser operador: escanear etiquetas en una inyectora y ver el viaje de cada mensaje.
+- Ser operador: llevar una OT completa con el recorrido guiado, provocar errores y ver el viaje de cada mensaje.
 - Rastrear cualquier bolsa, caja o tarima hasta el lote de resina.
 
 Nada de lo que haga aquí afecta a la planta. Puede provocar todas las fallas que quiera.
@@ -97,31 +97,70 @@ También puede **cortar la señal LoRa** de cualquier nodo por unos minutos, sub
 
 ## 5. Pestaña Terminal: sea el operador
 
-Aquí usted controla una inyectora. Las demás siguen trabajando solas.
+Aquí usted controla una inyectora. Las demás siguen trabajando solas. Arriba hay dos modos:
 
-### 5.1 Empezar
+- **Recorrido guiado de una OT** (abre por defecto): un botón **Siguiente** lleva una OT de principio a fin. Es el modo para presentar.
+- **Modo libre y misiones:** usted escanea a mano y sigue siete misiones. Es el modo para practicar.
 
-1. Elija la inyectora y presione **Tomar el control**. Su ciclo automático se pausa.
-2. Si no tiene OT, presione **Pedir OT nueva**. Planeación la crea, el almacén sube la resina, la mezanina la carga y la OT se libera. Espere a que la pantalla diga *Escanee gafete, OT y QR*. Si el botón está apagado es porque ya viene una OT en camino.
-3. Escanee haciendo clic en las **etiquetas a la mano**, escribiendo el código en el **lector** y presionando Enter, o con un lector USB real (funciona como teclado).
-4. Para terminar, presione **Regresar a automático**.
+Los dos usan la misma terminal y hacen lo mismo que haría el operador. Si cambia de modo a la mitad, la máquina sigue donde iba.
 
-### 5.2 La terminal
+### 5.1 La terminal
 
-- **Pantalla y torreta:** lo mismo que vería el operador en la máquina.
-- **Gafete · OT · QR:** se marcan conforme los escanea. Los tres en orden arrancan la máquina (CP 06).
-- **Báscula:** mueva el deslizador para elegir el peso y presione **Poner bolsa en la báscula**. Dice si el peso está dentro de tolerancia. Después escanee la etiqueta de la bolsa (CP 07).
-- **Memoria de la terminal:** cada cuadrito es un mensaje que todavía no recibe confirmación del servidor. Normalmente aparece y desaparece en un segundo. Sin señal, se acumulan (en rojo).
-- **Cortar la señal LoRa / Restablecer la señal:** simula que la máquina queda fuera de alcance.
+A la izquierda está todo lo que se instala junto a la máquina:
+
+- **Torreta:** gris sin OT, ámbar esperando el arranque, verde produciendo, rojo bloqueada.
+- **Placa ESP32 LoRa:** es la terminal. Arriba dice qué máquina es y la señal de radio (en dBm). La **pantalla** muestra lo mismo que vería el operador; la última línea dice la señal y cuántos mensajes tiene en memoria. El **LED** parpadea en rojo cuando la placa transmite y en verde cuando le llega una respuesta.
+- **Gafete · OT · QR:** se marcan conforme se escanean. Los tres en orden arrancan la máquina (CP 06).
+- **QR fijo:** el código pegado en la máquina. Cada máquina tiene el suyo. Se ilumina en verde cuando se escanea.
+- **Lector de códigos:** puede escribir un código y presionar Enter, o usar un lector USB real (funciona como teclado). La luz roja del lector se enciende al leer.
+- **Báscula:** mueva el deslizador para elegir el peso y presione **Poner bolsa en la báscula**. Después escanee la etiqueta de la bolsa (CP 07).
+- **Memoria de la terminal:** cada cuadrito es un mensaje que todavía no recibe confirmación del servidor. Normalmente aparece y desaparece en un segundo. Sin señal, se acumulan.
+
+Botones de arriba:
+
+- **Elegir una máquina libre** (modo guiado): escoge una inyectora sin OT para empezar desde cero.
+- **Tomar el control / Regresar a automático:** pausa o reanuda el ciclo automático de la máquina.
+- **Pedir OT nueva** (modo libre).
 - **Llamar al supervisor:** solo se activa cuando la terminal está bloqueada.
+- **Cortar la señal LoRa / Restablecer la señal:** simula que la máquina queda fuera de alcance.
 
-### 5.3 Las etiquetas
+### 5.2 Recorrido guiado de una OT
 
-Las que están marcadas en rojo son incorrectas a propósito: un gafete no habilitado, una OT de otra máquina, una etiqueta que se salta una. Úselas para ver cómo responde el sistema.
+A la derecha se ven los 9 pasos, la explicación del paso actual y el botón **Siguiente**, que dice exactamente lo que va a hacer (por ejemplo, *Escanear gafete E1142*). El recorrido se fija en el estado real de la máquina: si alguien escanea a mano, sigue desde donde quedó.
 
-### 5.4 Misiones
+Una **OT** (orden de trabajo) es: "haga 12 bolsas de esta pieza en esta máquina".
 
-A la derecha de la terminal se muestra una misión a la vez, con las etiquetas a la mano justo debajo. La misión se marca sola cuando la terminal registra lo que pide: aparece "¡Lograda!" con lo que aprendió y, a los 5 segundos, pasa sola a la siguiente. Los puntos de arriba muestran el avance (verde = completada); con ellos o con las flechas puede ver cualquier misión. **Ir a la misión pendiente** lo regresa a la que sigue. Son siete:
+1. **Tomar la máquina.** Use antes **Elegir una máquina libre** para ver la OT completa desde el principio.
+2. **Solicitar la OT.** Planeación la programa (CP 03), el almacén sube la resina (CP 01–02), en la mezanina la vacían en el embudo (CP 04) y el supervisor entrega el **sobre con las etiquetas numeradas** B1 a B12 (CP 05). Los checkpoints se encienden uno por uno y aparece la **ficha de la OT que se generó**: número, máquina, molde, producto, resina, lote, bolsas y peso permitido. Cuando la OT llega por radio a la terminal, presione **Continuar**.
+3. **Gafete**, 4. **Carpeta de la OT** y 5. **QR de la máquina.** Al leer el QR, la terminal revisa los tres juntos y, si cuadran, la máquina arranca y la torreta pasa a verde.
+6. **Bolsa 1: pesar y etiquetar.** La máquina va soltando piezas en una bolsa. Llena, el operador la pone en la báscula (confirma que trae las piezas correctas), le pega la siguiente etiqueta del sobre y la escanea. Las etiquetas van en orden: no se puede saltar ninguna.
+7. **Bolsas 2–4: charola 1.** La **charola** es la bandeja donde se juntan las bolsas junto a la máquina; le caben 4. No es un paso distinto: es repetir el paso 6 hasta juntar 4 bolsas, y el botón lo hace de corrido. Con 4 bolsas, inspección la recoge, revisa una de muestra (CP 08), el supervisor la libera (CP 09) y se lleva a la mesa de empaque SM1 (CP 10). Mientras, la máquina llena la siguiente.
+8. **Bolsas 5–12.** Lo mismo: dos charolas más. Con la última bolsa la OT queda completa en la máquina.
+9. **Recorre la planta.** Ya no depende de la máquina: las bolsas se meten en cajas (CP 11–12), pasan a pre-envío (CP 13), se arma la tarima (CP 14), la cámara confirma que están todas (CP 15) y se despacha (CP 16). Los checkpoints se encienden solos. **Ver la genealogía completa** abre la pestaña Trazabilidad con esa OT. **Empezar otra OT** reinicia el recorrido.
+
+Las charolas dibujadas debajo de la explicación muestran cuántas bolsas van y cuáles ya salieron a SM1.
+
+### 5.3 Mostrar errores
+
+Debajo del botón Siguiente, **Mostrar un error** ofrece los errores que aplican al paso actual. Cada uno hace mal el paso a propósito y explica, en una tarjeta, qué se hizo mal, qué mostró la terminal y cómo se corrige.
+
+| Error | Cuándo aparece | Qué pasa | Cómo se corrige |
+|---|---|---|---|
+| Gafete no habilitado | Arranque | La terminal se **bloquea**: torreta roja, no acepta más escaneos | **Llamar al supervisor** (el botón Siguiente cambia a eso). Luego se repite el arranque |
+| Carpeta de otra máquina | Arranque | Igual: bloqueo | Igual |
+| QR de la máquina vecina | Arranque | Igual: bloqueo | Igual |
+| Bolsa fuera de peso | Bolsas | La bolsa se **rechaza**; la máquina sigue y el contador no avanza | Siguiente: se vuelve a pesar y se usa la misma etiqueta |
+| Saltarse una etiqueta | Bolsas | Rechazo: "salto en la secuencia" | Siguiente: se escanea la etiqueta que tocaba |
+| Etiqueta de otra OT | Bolsas | Rechazo: la etiqueta es de otro sobre | Siguiente: se usa la etiqueta de esta OT |
+| Cortar la señal LoRa | Arranque y bolsas | La terminal sigue validando; los mensajes se guardan en su memoria | **Devolver la señal LoRa**: reenvía todo en orden, sin perder nada |
+
+Diferencia importante para explicar: un **error de arranque bloquea** la máquina (no debe producir con el operador, la OT o la máquina equivocados); un **error de bolsa solo rechaza esa bolsa** y la producción sigue. En los dos casos el rechazo queda guardado en el MES.
+
+### 5.4 Modo libre: etiquetas y misiones
+
+**Etiquetas a la mano:** haga clic en una para escanearla. Las marcadas en rojo son incorrectas a propósito: un gafete no habilitado, una OT de otra máquina, una etiqueta que se salta una.
+
+**Misiones:** se muestra una misión a la vez. Se marca sola cuando la terminal registra lo que pide: aparece "¡Lograda!" con lo que aprendió y, a los 5 segundos, pasa a la siguiente. Los puntos de arriba muestran el avance (verde = completada); con ellos o con las flechas puede ver cualquier misión. **Ir a la misión pendiente** lo regresa a la que sigue. Son siete:
 
 1. **Arranque la máquina:** gafete, OT y QR.
 2. **Registre una bolsa:** pesar y escanear.
@@ -173,11 +212,13 @@ Abajo aparecen todos los eventos de ese código en orden, con su CP, resultado y
 
 **No veo nada en la página.** El servidor no está encendido. Ejecute `npm start` y recargue.
 
-**No encuentro cómo tomar el control.** Está en la pestaña *Terminal*, arriba a la izquierda. Si no aparece, recargue con `Ctrl + F5`.
+**No encuentro cómo tomar el control.** En la pestaña *Terminal*, en el modo **Recorrido guiado**, el botón **Siguiente** lo hace por usted; en el modo libre está arriba a la izquierda. Si no aparece, recargue con `Ctrl + F5`.
+
+**El botón Siguiente está apagado y dice "Esperando…".** La OT se está preparando (resina, mezanina, sobre). Se activa solo en unos segundos.
 
 **"Pedir OT nueva" está apagado.** La máquina ya tiene una OT en curso o en preparación. Lea el texto de ayuda debajo de los botones.
 
-**La terminal está en rojo y no acepta escaneos.** Está bloqueada por un error de arranque. Presione *Llamar al supervisor*.
+**La terminal está en rojo y no acepta escaneos.** Está bloqueada por un error de arranque. Presione *Llamar al supervisor* (en el modo guiado, el botón Siguiente hace lo mismo).
 
 **El escaneo dice correcto pero el mensaje sigue "en memoria".** La terminal ya validó; solo falta que la radio lo entregue. Si la señal está cortada, restablézcala.
 

@@ -95,16 +95,22 @@
     </section>
 
     <!-- ───────────── TERMINAL MANUAL ───────────── -->
-    <section class="vista" id="vista-terminal" hidden>
+    <section class="vista" id="vista-terminal" data-modo="guiado" hidden>
+      <div class="t-modos" role="tablist" aria-label="Cómo usar la terminal">
+        <button type="button" role="tab" data-modo="guiado" aria-selected="true">Recorrido guiado de una OT</button>
+        <button type="button" role="tab" data-modo="libre" aria-selected="false">Modo libre y misiones</button>
+      </div>
+
       <div class="mando">
         <label>Inyectora <select id="m-maquina"></select></label>
+        <button type="button" id="m-libre-maq" class="btn secundario solo-guiado">Elegir una máquina libre</button>
         <button type="button" id="m-tomar" class="btn">Tomar el control</button>
-        <button type="button" id="m-ot" class="btn secundario">Pedir OT nueva</button>
+        <button type="button" id="m-ot" class="btn secundario solo-libre">Pedir OT nueva</button>
         <button type="button" id="m-sup" class="btn secundario">Llamar al supervisor</button>
         <button type="button" id="m-senal-btn" class="btn secundario">Cortar la señal LoRa</button>
         <p id="m-fase" class="fase"></p>
       </div>
-      <p id="m-ayuda" class="m-ayuda"></p>
+      <p id="m-ayuda" class="m-ayuda solo-libre"></p>
       <p id="m-mensaje" class="m-mensaje" role="status"></p>
 
       <div class="banco">
@@ -112,31 +118,72 @@
           <div class="torre" aria-label="Torreta Andon">
             <i class="l-rojo"></i><i class="l-ambar"></i><i class="l-verde"></i>
           </div>
-          <div class="carcasa">
-            <div class="carcasa-cab"><span id="m-nombre">L1-INY-01</span><span id="m-senal"></span></div>
-            <div class="pantalla-oled" id="m-oled"><div id="m-l1">—</div><div id="m-l2">—</div></div>
+          <div class="montaje">
+            <div class="placa" aria-label="Terminal de la máquina: placa ESP32 con radio LoRa y pantalla OLED">
+              <div class="pines" aria-hidden="true"></div>
+              <div class="placa-cuerpo">
+                <div class="usb" aria-hidden="true" title="USB-C"></div>
+                <div class="placa-centro">
+                  <div class="serigrafia"><span id="m-nombre">L1-INY-01</span><span id="m-senal"></span></div>
+                  <div class="pantalla-oled" id="m-oled"><div id="m-l1">—</div><div id="m-l2">—</div><div id="m-l3" class="oled-pie"></div></div>
+                  <div class="placa-pie">
+                    <span class="boton-placa" aria-hidden="true">PRG</span>
+                    <span class="led" id="m-led" title="LED de transmisión LoRa"></span>
+                    <span class="modelo">WiFi LoRa 32 · ESP32 · 915 MHz</span>
+                    <span class="boton-placa" aria-hidden="true">RST</span>
+                  </div>
+                </div>
+                <div class="antena" aria-hidden="true"><i></i></div>
+              </div>
+              <div class="pines" aria-hidden="true"></div>
+            </div>
+
             <div class="arranque" id="m-arranque" aria-label="Lecturas del arranque">
               <span data-k="gafete">Gafete</span><span data-k="ot">OT</span><span data-k="qr">QR</span>
             </div>
+
+            <div class="perifericos">
+              <figure class="qr-maquina" aria-label="QR fijo pegado en la máquina">
+                <div id="m-qr" class="qr"></div>
+                <figcaption><b>QR fijo</b><code id="m-qr-txt">—</code></figcaption>
+              </figure>
+              <form id="m-form-scan" class="lector">
+                <label for="m-scan"><span class="escaner" aria-hidden="true"><i></i></span>Lector de códigos <small>GM65 · serial</small></label>
+                <input id="m-scan" autocomplete="off" spellcheck="false" placeholder="Escanee o escriba y presione Enter">
+              </form>
+            </div>
+
+            <form id="m-form-peso" class="bascula">
+              <div class="bascula-pantalla"><output id="m-peso-out">—</output></div>
+              <label for="m-peso" class="sr">Peso de la bolsa</label>
+              <input id="m-peso" type="range" min="0" max="3000" step="1" value="0">
+              <button type="submit" class="btn secundario">Poner bolsa en la báscula</button>
+            </form>
+
             <div class="bufer-vis">
               <span>Memoria de la terminal</span>
               <div id="m-bufer" class="pila" aria-live="polite"></div>
             </div>
-            <form id="m-form-scan" class="lector">
-              <label for="m-scan">Lector de códigos</label>
-              <input id="m-scan" autocomplete="off" spellcheck="false" placeholder="Escanee o escriba un código y presione Enter">
-            </form>
-            <form id="m-form-peso" class="bascula">
-              <label for="m-peso">Báscula <output id="m-peso-out">—</output></label>
-              <input id="m-peso" type="range" min="0" max="3000" step="1" value="0">
-              <button type="submit" class="btn secundario">Poner bolsa en la báscula</button>
-            </form>
-            <p class="ayuda">Si tiene un lector USB que funciona como teclado, haga clic en el campo del lector y escanee: el código entra igual que si lo escribiera.</p>
+            <p class="ayuda solo-libre">Si tiene un lector USB que funciona como teclado, haga clic en el campo del lector y escanee: el código entra igual que si lo escribiera.</p>
           </div>
         </div>
 
         <div class="columna-der">
-          <section class="caja-panel misiones" aria-label="Misiones">
+          <section class="caja-panel recorrido solo-guiado" aria-label="Recorrido guiado de una OT">
+            <header class="rec-cab">
+              <h2>Recorrido de una OT</h2>
+              <span class="rec-ot" id="r-ot"></span>
+            </header>
+            <ol class="rec-pasos" id="r-pasos"></ol>
+            <div class="rec-actual" id="r-actual" aria-live="polite"></div>
+            <div class="rec-acciones">
+              <button type="button" id="r-siguiente" class="btn btn-grande">Siguiente ▶</button>
+              <button type="button" id="r-reiniciar" class="btn-texto">Empezar otra OT</button>
+            </div>
+            <div class="rec-errores" id="r-errores" hidden></div>
+          </section>
+
+          <section class="caja-panel misiones solo-libre" aria-label="Misiones">
             <header class="misiones-cab">
               <h2>Misión <span id="m-num"></span></h2>
               <ol class="puntos" id="m-puntos" aria-label="Avance de misiones"></ol>
@@ -148,7 +195,7 @@
             <div id="m-mision" class="mision-tarjeta" aria-live="polite"></div>
           </section>
 
-          <section class="caja-panel etiquetas">
+          <section class="caja-panel etiquetas solo-libre">
             <h2>Etiquetas a la mano <span class="nota">haga clic en una para escanearla</span></h2>
             <div id="m-etiquetas"></div>
           </section>

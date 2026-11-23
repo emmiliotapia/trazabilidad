@@ -19,6 +19,7 @@ let maquina = 'L1-INY-01';
 let info = null; // etiquetas y fase de la máquina (API)
 let vista = null; // última vista del nodo (SSE estado)
 let foco = null; // seq del escaneo que se anima
+let ultimoEstado = null; // último estado completo de la planta (SSE), para elegir una máquina libre
 const escaneos = new Map(); // seq → { codigo, cp, ok, estado, chip, offline, intentos }
 
 const api = (cuerpo) => fetch('/api/manual', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ maquina, ...cuerpo }) }).then((r) => r.json());
@@ -240,9 +241,13 @@ function siguiente() {
 
 // ───────────────────────── escanear ─────────────────────────
 async function escanear(codigo) {
-  if (!codigo) return;
+  if (!codigo) return null;
+  destello($('#m-form-scan'), 'lee', 450);
   const r = await api({ accion: 'escanear', codigo });
-  if (!r.ok) return mensaje(r.mensaje, 'mal');
+  if (!r.ok) {
+    mensaje(r.mensaje, 'mal');
+    return r;
+  }
   const ev = r.evento;
   const li = h('li', {}, h('time', { text: new Date().toLocaleTimeString('es-MX', { hour12: false }) }), h('code', { text: codigo }));
   if (!ev) {
@@ -275,6 +280,14 @@ async function escanear(codigo) {
   $('#m-historial').prepend(li);
   while ($('#m-historial').children.length > 40) $('#m-historial').lastChild.remove();
   cargarEtiquetas();
+  return r;
+}
+
+function destello(el, clase, ms) {
+  if (!el) return;
+  el.classList.add(clase);
+  clearTimeout(el._destello);
+  el._destello = setTimeout(() => el.classList.remove(clase), ms);
 }
 
 // Los avisos (aire, MQTT, MES, ACK) pueden llegar al navegador en otro orden;
@@ -302,6 +315,9 @@ function cambiarEstado(seq, estado, texto) {
 // ───────────────────────── eventos del servidor (los reenvía app.js) ─────────────────────────
 export function alAire(t) {
   if (t.nodo !== maquina) return;
+  // LED de la placa: rojo cuando la terminal transmite, verde cuando le llega algo del gateway
+  if (t.dir === 'subida') destello($('#m-led'), 'tx', 220);
+  else if (t.estado === 'ok') destello($('#m-led'), 'rx', 220);
   if (t.dir === 'subida' && t.tipo === 'EVENTO' && escaneos.has(t.seq)) {
     const e = escaneos.get(t.seq);
     e.intentos++;
@@ -385,6 +401,7 @@ export function alMES(m) {
 }
 
 export function alEstado(est) {
+  ultimoEstado = est;
   if (!$('#m-maquina').options.length) {
     opcionesPorLinea($('#m-maquina'), est.nodos);
     $('#m-maquina').value = maquina;
@@ -399,6 +416,7 @@ export function alEstado(est) {
   $('#m-senal').classList.toggle('mala', n.sinSenal);
   $('#m-l1').textContent = n.pantalla.l1;
   $('#m-l2').textContent = n.pantalla.l2;
+  $('#m-l3').textContent = `${n.sinSenal ? 'SIN SEÑAL' : `LoRa ${n.rssi} dBm`} · memoria ${n.bufer}`;
   document.querySelector('.equipo').dataset.color = n.pantalla.color;
   for (const s of document.querySelectorAll('#m-arranque span')) s.classList.toggle('ok', !!(n.arrancada || n.lecturas?.[s.dataset.k]));
   const total = n.bufer;
@@ -416,7 +434,11 @@ export function alEstado(est) {
 async function cargarEtiquetas() {
   const r = await fetch(`/api/manual/etiquetas?maquina=${maquina}`);
   if (!r.ok) return;
-  info = await r.json();
+  const nuevo = await r.json();
+  if (nuevo.maquina !== maquina) return; // llegó tarde, de otra máquina
+  info = nuevo;
+  pintarQR(info.qr);
+  pintarRecorrido();
   $('#m-tomar').textContent = info.manual ? 'Regresar a automático' : 'Tomar el control';
   $('#m-tomar').classList.toggle('secundario', info.manual);
   $('#m-ot').disabled = !info.puedePedirOT;
@@ -462,6 +484,8 @@ $('#m-maquina').onchange = (e) => {
   maquina = e.target.value;
   foco = null;
   vista = null;
+  info = null;
+  reiniciarRecorrido();
   escaneos.clear();
   $('#m-historial').replaceChildren();
   reiniciarViaje('Escanee algo para ver por dónde pasa el mensaje.');
@@ -512,6 +536,518 @@ setInterval(() => visible() && cargarEtiquetas(), 2500);
 document.querySelector('[data-vista="terminal"]').addEventListener('click', () => {
   cargarEtiquetas();
   pintarMisiones();
+  pintarRecorrido();
   if (info?.manual) setTimeout(() => $('#m-scan').focus(), 50);
 });
 pintarMisiones();
+
+// ───────────────────────── QR fijo de la máquina (dibujo) ─────────────────────────
+// Es un dibujo con forma de QR generado a partir del código (no un QR legible por teléfono):
+// tres marcas de esquina y módulos que dependen del texto, para que cada máquina tenga el suyo.
+let qrPintado = null;
+function pintarQR(texto) {
+  if (!texto || texto === qrPintado) return;
+  qrPintado = texto;
+  $('#m-qr-txt').textContent = texto;
+  const n = 25;
+  let s = 2166136261;
+  for (const c of texto) s = Math.imul(s ^ c.charCodeAt(0), 16777619);
+  const azarQR = () => {
+    s ^= s << 13;
+    s ^= s >>> 17;
+    s ^= s << 5;
+    return (s >>> 0) / 4294967296;
+  };
+  const marca = (x, y) => (x < 8 && y < 8) || (x >= n - 8 && y < 8) || (x < 8 && y >= n - 8);
+  let d = '';
+  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) if (!marca(x, y) && azarQR() < 0.48) d += `M${x} ${y}h1v1h-1z`;
+  const esquina = (x, y) => `M${x} ${y}h7v7h-7zM${x + 1} ${y + 1}v5h5v-5zM${x + 2} ${y + 2}h3v3h-3z`;
+  d += esquina(0, 0) + esquina(n - 7, 0) + esquina(0, n - 7);
+  $('#m-qr').innerHTML = `<svg viewBox="-1 -1 ${n + 2} ${n + 2}" role="img" aria-label="QR de la máquina"><rect x="-1" y="-1" width="${n + 2}" height="${n + 2}" fill="#fff"/><path d="${d}" fill="#111" fill-rule="evenodd"/></svg>`;
+}
+
+// ───────────────────────── recorrido guiado de una OT ─────────────────────────
+// Un botón "Siguiente" lleva una OT de principio a fin. Cada paso hace lo que haría la persona
+// en planta (pedir la OT, escanear, pesar) con las mismas llamadas que el modo libre, y el paso
+// actual se deduce del estado real de la máquina: si alguien escanea a mano, el recorrido lo sigue.
+const PASOS = [
+  { id: 'tomar', corto: 'Tomar la máquina' },
+  { id: 'pedir', corto: 'Solicitar la OT' },
+  { id: 'gafete', corto: 'Gafete' },
+  { id: 'ot', corto: 'Carpeta de la OT' },
+  { id: 'qr', corto: 'QR de la máquina' },
+  { id: 'bolsa', corto: 'Bolsa 1: pesar y etiquetar' },
+  { id: 'charola', corto: 'Bolsas 2–4: charola 1' },
+  { id: 'resto', corto: 'Bolsas 5–12' },
+  { id: 'planta', corto: 'Recorre la planta' },
+];
+const R = { ot: null, g: null, ocupado: false, progreso: '', revelado: 0, tRevelado: 0, fichaVista: null, viendoPrep: false, error: null, clavesErr: '' };
+const pausa = (ms) => new Promise((ok) => setTimeout(ok, ms));
+const modoGuiado = () => $('#vista-terminal').dataset.modo === 'guiado';
+
+function reiniciarRecorrido() {
+  R.ot = null;
+  R.g = null;
+  R.progreso = '';
+  R.revelado = 0;
+  R.fichaVista = null;
+  R.viendoPrep = false;
+  R.error = null;
+}
+
+function pasoActual() {
+  if (!info?.manual) return 'tomar';
+  const f = info.faseClave;
+  if (R.viendoPrep) return 'pedir'; // se queda aquí hasta que el presentador pulse Continuar
+  if (info.solicitada || ['planificacion', 'resina', 'liberacion'].includes(f)) return 'pedir';
+  if (f === 'produccion') {
+    if (!info.arrancada) {
+      const l = vista?.lecturas ?? {};
+      if (!l.gafete) return 'gafete';
+      if (!l.ot) return 'ot';
+      return 'qr';
+    }
+    const k = info.siguiente ?? 1;
+    if (k <= 1) return 'bolsa';
+    if (k <= (info.bolsasPorCharola ?? 4)) return 'charola';
+    return 'resto';
+  }
+  if (f === 'cierre' || (f === 'terminada' && R.ot)) return 'planta';
+  return 'pedir';
+}
+
+// Lo que el MES ya registró de esta OT, por checkpoint
+function cpsDeLaOT() {
+  const m = new Map();
+  for (const e of R.g?.eventos ?? []) {
+    const antes = m.get(e.cp);
+    m.set(e.cp, { ok: (antes?.ok ?? 0) + (e.resultado === 'PASS' ? 1 : 0), mal: (antes?.mal ?? 0) + (e.resultado === 'PASS' ? 0 : 1) });
+  }
+  return m;
+}
+
+async function cargarGenealogiaRecorrido() {
+  if (!R.ot || !visible() || !modoGuiado()) return;
+  const ot = R.ot;
+  const r = await fetch(`/api/genealogia?id=${encodeURIComponent(ot)}`);
+  if (R.ot !== ot || !r.ok) return;
+  R.g = await r.json();
+  pintarRecorrido();
+}
+
+const grupo = (titulo) => info?.grupos?.find((g) => g.titulo === titulo)?.items ?? [];
+const codigoGafete = () => grupo('Gafetes').find((x) => !x.malo)?.codigo;
+const codigoQR = () => grupo('QR fijo de la máquina').find((x) => !x.malo)?.codigo;
+const etiquetaSiguiente = () => grupo('Etiquetas correlativas del sobre').find((x) => x.nota.startsWith('siguiente'))?.codigo;
+
+// Una bolsa completa: báscula (peso dentro de tolerancia) y etiqueta correlativa (CP 07)
+async function registrarBolsa() {
+  const b = info?.bascula;
+  if (!b) return false;
+  const gramos = Math.round(b.nominal + (Math.random() - 0.5) * (b.tol / 2));
+  $('#m-peso').value = gramos;
+  pintarPeso();
+  await api({ accion: 'pesar', gramos });
+  await pausa(350);
+  const codigo = etiquetaSiguiente();
+  if (!codigo) return false;
+  const r = await escanear(codigo);
+  await cargarEtiquetas();
+  return !!r?.evento?.ok;
+}
+
+async function bolsasHasta(hasta) {
+  while (info?.manual && info.faseClave === 'produccion' && (info.siguiente ?? 99) <= hasta) {
+    R.progreso = `Registrando la bolsa ${info.siguiente} de ${info.totalBolsas}…`;
+    pintarRecorrido();
+    if (!(await registrarBolsa())) break;
+    await pausa(1100);
+  }
+  R.progreso = '';
+}
+
+async function accionSiguiente() {
+  if (R.ocupado) return;
+  R.ocupado = true;
+  const bloqueadaAntes = !!info?.bloqueado;
+  if (!bloqueadaAntes) R.error = null;
+  pintarRecorrido();
+  try {
+    if (bloqueadaAntes) {
+      const r = await api({ accion: 'desbloquear' });
+      mensaje(r.mensaje, r.ok ? '' : 'mal');
+      await pausa(1500);
+      R.error = r.ok
+        ? { tipo: 'bien', titulo: 'El supervisor liberó la terminal', texto: 'La orden DESBLOQUEAR llegó por LoRa. La terminal borró las lecturas anteriores: el operador vuelve a escanear gafete, OT y QR, esta vez los correctos.' }
+        : null;
+      return;
+    }
+    const paso = pasoActual();
+    if (paso === 'tomar') {
+      const r = await api({ accion: 'tomar' });
+      mensaje(r.mensaje, r.ok ? '' : 'mal');
+    } else if (paso === 'pedir' && R.viendoPrep) {
+      R.viendoPrep = false; // ya se vio cómo se generó: a arrancar la máquina
+    } else if (paso === 'pedir') {
+      reiniciarRecorrido();
+      const r = await api({ accion: 'pedirOT' });
+      mensaje(r.mensaje, r.ok ? '' : 'mal');
+      R.viendoPrep = !!r.ok;
+    } else if (paso === 'gafete') {
+      await escanear(codigoGafete());
+    } else if (paso === 'ot') {
+      await escanear(info.ot);
+    } else if (paso === 'qr') {
+      destello(document.querySelector('.qr-maquina'), 'leido', 900);
+      await escanear(codigoQR());
+    } else if (paso === 'bolsa') {
+      await registrarBolsa();
+    } else if (paso === 'charola') {
+      await bolsasHasta(info.bolsasPorCharola ?? 4);
+    } else if (paso === 'resto') {
+      await bolsasHasta(info.totalBolsas ?? 12);
+    } else if (paso === 'planta') {
+      verGenealogia(R.ot);
+    }
+  } finally {
+    R.ocupado = false;
+    await cargarEtiquetas();
+  }
+}
+
+function verGenealogia(ot) {
+  if (!ot) return;
+  document.querySelector('[data-vista="traza"]').click();
+  $('#q').value = ot;
+  $('#form-busca').requestSubmit();
+}
+
+const cp = (num, texto, estado) => h('div', { class: `rcp ${estado ?? ''}` }, h('b', { text: num }), h('span', { text: texto }));
+
+// Revela los checkpoints de la preparación uno por uno, aunque el servidor los complete casi juntos
+function revelar(estados) {
+  const ahora = Date.now();
+  if (R.revelado < estados.length && estados[R.revelado] === 'ok' && ahora - R.tRevelado > 700) {
+    R.revelado++;
+    R.tRevelado = ahora;
+  }
+  return estados.map((e, i) => (i < R.revelado ? e : i === R.revelado ? 'va' : ''));
+}
+
+function fichaOT() {
+  const o = R.g?.orden;
+  if (!o) return null;
+  const lote = R.g.lotes?.[0]?.id_lote;
+  const dato = (k, v) => (v ? h('div', {}, h('dt', { text: k }), h('dd', { text: v })) : null);
+  const ficha = h('dl', { class: `ot-ficha${R.fichaVista === o.ot ? '' : ' nueva'}` },
+    dato('Orden de trabajo', o.ot),
+    dato('Máquina', o.id_maquina),
+    dato('Molde', o.id_molde),
+    dato('Producto', info?.producto?.descripcion ? `${o.sku_producto} · ${info.producto.descripcion}` : o.sku_producto),
+    dato('Resina', o.sku_resina),
+    dato('Lote de resina', lote),
+    dato('Bolsas', String(o.total_bolsas)),
+    dato('Peso por bolsa', `${o.peso_nominal_g} ± ${o.tolerancia_g} g`),
+    dato('Estado en el MES', o.estado));
+  R.fichaVista = o.ot;
+  return ficha;
+}
+
+function barraBolsas() {
+  const total = info?.totalBolsas ?? 12;
+  const por = info?.bolsasPorCharola ?? 4;
+  const k = pasoActual() === 'planta' ? total + 1 : info?.siguiente ?? 1;
+  const retiradas = cpsDeLaOT().get(10)?.ok ?? 0;
+  const charolas = [];
+  for (let c = 0; c < Math.ceil(total / por); c++) {
+    const bolsas = Array.from({ length: por }, (_, i) => {
+      const n = c * por + i + 1;
+      return h('i', { class: n < k ? 'lista' : n === k && R.ocupado ? 'va' : '', title: `Bolsa ${n}` });
+    });
+    charolas.push(h('div', { class: `charola${c < retiradas ? ' salio' : ''}`, title: `Charola ${c + 1}${c < retiradas ? ': ya salió a SM1' : ''}` }, ...bolsas));
+  }
+  return h('div', { class: 'bolsas-barra' }, ...charolas, h('small', { text: `${Math.min(k - 1, total)} de ${total} bolsas · ${retiradas} charola(s) en camino a SM1` }));
+}
+
+function contenidoPaso(paso) {
+  const n = info?.maquina ?? maquina;
+  const tarjeta = (quien, titulo, texto, ...extra) => [h('span', { class: 'quien', text: quien }), h('h3', { text: titulo }), h('p', { text: texto }), ...extra];
+  if (info?.bloqueado) {
+    return { boton: 'Llamar al supervisor', partes: tarjeta('Terminal bloqueada · torreta en rojo', 'La máquina no arranca hasta que venga el supervisor',
+      'La terminal no deja producir con un arranque inválido y no acepta más escaneos. El rechazo ya viajó por LoRa al MES, así que en la pantalla de planta esta máquina aparece en rojo. Solo el supervisor la libera desde el MES; esa orden también llega por radio.') };
+  }
+  switch (paso) {
+    case 'tomar': {
+      const ocupada = vista && vista.pantalla?.color !== 'gris';
+      return {
+        boton: `Tomar el control de ${n}`,
+        partes: tarjeta('Usted, frente a la máquina', `Tome el control de ${n}`,
+          'La máquina deja de trabajar sola y usted hace de operador. Las otras inyectoras siguen en automático.',
+          ocupada ? h('p', { class: 'esperando', text: 'Esta máquina ya trae una OT a medias. Para ver el recorrido completo desde cero, use "Elegir una máquina libre".' }) : null),
+      };
+    }
+    case 'pedir': {
+      const enCamino = R.viendoPrep || info?.solicitada || ['planificacion', 'resina', 'liberacion'].includes(info?.faseClave);
+      if (!enCamino) {
+        return {
+          boton: 'Solicitar una OT nueva',
+          partes: tarjeta('Planeación', 'Solicite una OT nueva',
+            'Al pedirla, el MES la programa (CP 03), el almacén sube la resina (CP 01–02), la mezanina la vacía en el embudo (CP 04) y el supervisor libera el sobre con las etiquetas 1..n (CP 05). Al final el MES manda la OT por LoRa a esta terminal.'),
+        };
+      }
+      const ev = cpsDeLaOT();
+      const real = [
+        R.g?.lotes?.length || ev.has(4) ? 'ok' : '',
+        ev.has(3) ? 'ok' : '',
+        ev.has(4) ? (ev.get(4).ok ? 'ok' : 'mal') : '',
+        ev.has(5) ? 'ok' : '',
+        info?.faseClave === 'produccion' ? 'ok' : '',
+      ];
+      const vis = revelar(real);
+      const lista = R.revelado >= real.length;
+      return {
+        boton: lista ? 'Continuar: arrancar la máquina' : 'Esperando a que llegue la OT…',
+        espera: !lista,
+        partes: [
+          ...tarjeta('Planeación · almacén · mezanina · supervisor', R.g?.orden ? `Se generó la ${R.g.orden.ot}` : 'Generando la OT…',
+            'Cada área registra su paso en el MES. Cuando el sobre se libera, el MES manda la OT a la terminal por radio y la pantalla pide gafete, OT y QR.'),
+          h('div', { class: 'cps' },
+            cp('CP 01–02', 'Lote de resina listo', vis[0]),
+            cp('CP 03', 'OT programada', vis[1]),
+            cp('CP 04', 'Resina en el embudo', vis[2]),
+            cp('CP 05', 'Sobre liberado', vis[3]),
+            cp('LoRa', 'OT llega a la terminal', vis[4])),
+          fichaOT(),
+        ],
+      };
+    }
+    case 'gafete':
+    case 'ot':
+    case 'qr': {
+      const l = vista?.lecturas ?? {};
+      const chips = h('div', { class: 'cps' },
+        cp('1', `Gafete ${codigoGafete() ?? ''}`, l.gafete ? 'ok' : paso === 'gafete' ? 'va' : ''),
+        cp('2', `OT ${info?.ot ?? ''}`, l.ot ? 'ok' : paso === 'ot' ? 'va' : ''),
+        cp('3', `QR ${codigoQR() ?? ''}`, paso === 'qr' ? 'va' : ''));
+      const textos = {
+        gafete: ['Escanee su gafete', `Escanear gafete ${codigoGafete() ?? ''}`, 'Primero el gafete: la terminal revisa que el operador esté habilitado para esta OT, con la lista que le mandó el MES. Todavía no sale nada por radio.'],
+        ot: ['Escanee la carpeta de la OT', `Escanear ${info?.ot ?? 'la OT'}`, 'La terminal confirma que la carpeta es de la OT que tiene cargada. Si fuera de otra máquina, la detendría aquí.'],
+        qr: ['Escanee el QR fijo de la máquina', `Escanear QR ${codigoQR() ?? ''}`, 'Con los 3 códigos en orden se completa CP 06: la máquina arranca, la torreta pasa a verde y sale el primer mensaje por LoRa. Abajo puede ver su viaje hasta el MES.'],
+      }[paso];
+      return { boton: textos[1], partes: [...tarjeta('Operador de inyección · CP 06', textos[0], textos[2]), chips, fichaOT()] };
+    }
+    case 'bolsa':
+      return {
+        boton: 'Pesar y etiquetar la bolsa 1',
+        partes: [...tarjeta('Operador de inyección · CP 07', 'Cada bolsa: báscula y etiqueta',
+          `La máquina ya está produciendo piezas que caen en una bolsa. Cuando la bolsa está llena, el operador la pone en la báscula: la terminal lee el peso y lo compara con ${info?.bascula?.nominal ?? '?'} ± ${info?.bascula?.tol ?? '?'} g (si pesa de más o de menos, sobran o faltan piezas). Después le pega la etiqueta que sigue del sobre (B1, B2, B3… hasta B${info?.totalBolsas ?? 'n'}) y la escanea. La terminal exige el orden: no se puede saltar ninguna.`), barraBolsas()],
+      };
+    case 'charola': {
+      const por = info?.bolsasPorCharola ?? 4;
+      return {
+        boton: R.progreso || `Llenar la charola (bolsas ${info?.siguiente}–${por})`,
+        partes: [...tarjeta('Operador de inyección · CP 07', 'Se repite con cada bolsa hasta llenar la charola',
+          `La charola es la bandeja donde se acomodan las bolsas junto a la máquina: le caben ${por}. Este botón registra las bolsas ${info?.siguiente}–${por}, una por una (báscula y etiqueta). En cuanto la charola tiene ${por}, inspección la recoge: revisa una bolsa de muestra (CP 08), el supervisor la libera (CP 09) y se lleva a la mesa de empaque SM1 (CP 10). Mientras, la máquina sigue llenando la siguiente.`), barraBolsas()],
+      };
+    }
+    case 'resto':
+      return {
+        boton: R.progreso || `Terminar la OT (bolsas ${info?.siguiente}–${info?.totalBolsas})`,
+        partes: [...tarjeta('Operador de inyección · CP 07', 'Termine la OT',
+          `Faltan ${(info?.totalBolsas ?? 0) - (info?.siguiente ?? 1) + 1} bolsas, o sea ${Math.ceil(((info?.totalBolsas ?? 0) - (info?.siguiente ?? 1) + 1) / (info?.bolsasPorCharola ?? 4))} charola(s) más. Es lo mismo de antes, bolsa por bolsa; este botón las registra seguidas. Cada charola que se completa sale a inspección y a SM1 mientras la máquina sigue. Con la última bolsa la OT queda completa en la máquina.`), barraBolsas()],
+      };
+    case 'planta': {
+      const ev = cpsDeLaOT();
+      const etapas = [[8, 'Inspección visual'], [9, 'Charola liberada'], [10, 'Retiro a SM1'], [11, 'Bolsas en caja'], [12, 'Caja cerrada'], [13, 'Pre-envío'], [14, 'Tarima'], [15, 'Cámara 4/4'], [16, 'Despachada']];
+      const primeraFalta = etapas.findIndex(([c]) => !ev.get(c)?.ok);
+      const despachada = !!ev.get(16)?.ok;
+      return {
+        boton: 'Ver la genealogía completa',
+        partes: [
+          ...tarjeta('Inspección · SM1 · almacén PT · embarque', despachada ? `¡La ${R.ot} ya se despachó!` : `La ${R.ot ?? 'OT'} recorre la planta`,
+            despachada
+              ? 'Pasó los 16 checkpoints. En la genealogía se ve todo su camino: lote de resina, bolsas, cajas, tarima y despacho.'
+              : 'Ya no depende de la máquina: las charolas pasan a inspección y a SM1, las cajas a pre-envío y, cuando están todas, se arma la tarima, la cámara la confirma y se despacha. Se actualiza solo.'),
+          h('div', { class: 'cps' }, ...etapas.map(([c, t], i) => cp(`CP ${String(c).padStart(2, '0')}`, `${t}${ev.get(c)?.ok > 1 ? ` ×${ev.get(c).ok}` : ''}`,
+            ev.get(c)?.mal && !ev.get(c)?.ok ? 'mal' : ev.get(c)?.ok ? 'ok' : i === primeraFalta ? 'va' : ''))),
+          barraBolsas(),
+        ],
+      };
+    }
+    default:
+      return { boton: 'Siguiente ▶', partes: [] };
+  }
+}
+
+function pintarRecorrido() {
+  if (!modoGuiado()) return;
+  if (info?.ot && info.faseClave && info.faseClave !== 'terminada' && R.ot !== info.ot) {
+    R.ot = info.ot;
+    R.g = null;
+    cargarGenealogiaRecorrido();
+  }
+  const paso = pasoActual();
+  const idx = PASOS.findIndex((p) => p.id === paso);
+  $('#r-pasos').replaceChildren(...PASOS.map((p, i) =>
+    h('li', { class: i < idx ? 'hecho' : i === idx ? 'actual' : '' }, h('b', { text: i < idx ? '✓' : String(i + 1) }), h('span', { text: p.corto }))));
+  $('#r-ot').textContent = R.ot ?? '';
+  const c = contenidoPaso(paso);
+  $('#r-actual').replaceChildren(...[tarjetaError(), ...c.partes].filter(Boolean));
+  pintarErrores(paso);
+  const btn = $('#r-siguiente');
+  btn.textContent = R.ocupado && !R.progreso ? 'Un momento…' : `${c.boton}${c.espera || R.progreso ? '' : ' ▶'}`;
+  btn.disabled = R.ocupado || !!c.espera;
+  $('#r-reiniciar').hidden = paso !== 'planta';
+}
+
+function ponerModo(m) {
+  $('#vista-terminal').dataset.modo = m;
+  localStorage.setItem('terminal-modo', m);
+  for (const b of document.querySelectorAll('.t-modos button')) b.setAttribute('aria-selected', String(b.dataset.modo === m));
+  if (m === 'guiado') pintarRecorrido();
+  else pintarMisiones();
+}
+
+function elegirMaquinaLibre() {
+  const libres = (ultimoEstado?.nodos ?? []).filter((n) => n.tipo === 'inyectora' && n.pantalla?.color === 'gris' && !n.sinSenal);
+  if (!libres.length) return mensaje('No hay máquinas sin OT en este momento; elija cualquiera de la lista.', 'mal');
+  const n = libres[Math.floor(Math.random() * libres.length)];
+  const sel = $('#m-maquina');
+  sel.value = n.nombre;
+  sel.dispatchEvent(new Event('change'));
+  mensaje(`${n.nombre} está libre (sin OT). Presione Siguiente para tomar el control.`);
+}
+
+for (const b of document.querySelectorAll('.t-modos button')) b.onclick = () => ponerModo(b.dataset.modo);
+$('#r-siguiente').onclick = accionSiguiente;
+$('#r-reiniciar').onclick = () => {
+  reiniciarRecorrido();
+  pintarRecorrido();
+};
+$('#m-libre-maq').onclick = elegirMaquinaLibre;
+ponerModo(localStorage.getItem('terminal-modo') ?? 'guiado');
+// Mientras se prepara la OT conviene preguntar más seguido; la genealogía alimenta los checkpoints
+setInterval(() => {
+  if (!visible() || !modoGuiado()) return;
+  if (pasoActual() === 'pedir' && !R.ocupado) cargarEtiquetas();
+  else pintarRecorrido();
+}, 900);
+setInterval(cargarGenealogiaRecorrido, 2500);
+
+// ───────────────────────── errores para demostrar ─────────────────────────
+// Cada botón hace mal un paso a propósito, con las mismas llamadas que haría el operador,
+// para que se vea dónde se detiene la terminal y cómo se corrige.
+function tarjetaError() {
+  const e = R.error;
+  if (!e) return null;
+  return h('div', { class: `rec-error ${e.tipo ?? ''}` },
+    h('strong', { text: e.titulo }),
+    e.terminal ? h('p', {}, h('span', { class: 'quien', text: 'La terminal mostró: ' }), h('code', { text: e.terminal })) : null,
+    h('p', { text: e.texto }),
+    e.arreglo ? h('p', { class: 'arreglo' }, h('b', { text: 'Cómo se corrige: ' }), e.arreglo) : null);
+}
+
+async function arranqueConError(malo) {
+  const bad = (titulo) => grupo(titulo).find((x) => x.malo)?.codigo;
+  const codigos = {
+    gafete: malo === 'gafete' ? bad('Gafetes') : codigoGafete(),
+    ot: malo === 'ot' ? bad('Carpeta de la OT') : info.ot,
+    qr: malo === 'qr' ? bad('QR fijo de la máquina') : codigoQR(),
+  };
+  // el arranque se valida completo al leer el QR, así que se escanean los tres
+  await escanear(codigos.gafete);
+  await pausa(800);
+  await escanear(codigos.ot);
+  await pausa(800);
+  destello(document.querySelector('.qr-maquina'), 'leido', 900);
+  const r = await escanear(codigos.qr);
+  const que = {
+    gafete: ['Gafete no habilitado', `Se escaneó el gafete ${codigos.gafete}, que no está en la lista de operadores autorizados para esta OT.`],
+    ot: ['Carpeta de otra máquina', `Se escaneó la carpeta ${codigos.ot}, que pertenece a otra máquina: esta terminal tiene cargada la ${info.ot}.`],
+    qr: ['QR de la máquina vecina', `Se escaneó ${codigos.qr}, el QR de la máquina de al lado: la OT se mandó a ${info.maquina}, no a esa.`],
+  }[malo];
+  R.error = {
+    titulo: `Error provocado: ${que[0]}`,
+    terminal: r?.mensaje,
+    texto: `${que[1]} La terminal revisa los tres códigos juntos al leer el QR (CP 06) y lo decide ella misma, aunque no haya señal. Por eso se bloquea, la torreta pasa a rojo y la máquina no puede producir.`,
+    arreglo: 'presione "Llamar al supervisor". Él libera la terminal desde el MES y el operador repite el arranque con los códigos correctos.',
+  };
+}
+
+async function bolsaConError(tipo) {
+  const b = info.bascula;
+  const k = info.siguiente;
+  const gramos = tipo === 'peso' ? b.nominal + b.tol * 3 : b.nominal;
+  $('#m-peso').value = gramos;
+  pintarPeso();
+  await api({ accion: 'pesar', gramos });
+  await pausa(500);
+  const etiq = tipo === 'peso'
+    ? etiquetaSiguiente()
+    : grupo('Etiquetas correlativas del sobre').find((x) => x.malo && (tipo === 'salto' ? x.nota === 'se salta una' : x.nota === 'de otra OT'))?.codigo;
+  const r = await escanear(etiq);
+  const que = {
+    peso: ['Bolsa fuera de peso', `La bolsa ${k} pesó ${gramos} g y lo permitido es ${b.nominal} ± ${b.tol} g: le sobran piezas.`, 'se ajusta la bolsa y se vuelve a pesar. Presione Siguiente: se pesa bien y se usa la misma etiqueta.'],
+    salto: ['Se saltó una etiqueta', `Tocaba la etiqueta B${k} y se escaneó ${etiq}. Si se aceptara, quedaría un hueco en la secuencia y nadie sabría qué pasó con esa bolsa.`, `se busca la etiqueta B${k} del sobre. Presione Siguiente para registrarla.`],
+    ajena: ['Etiqueta de otra OT', `Se escaneó ${etiq}, que es del sobre de otra orden. Esa bolsa se contaría en una OT equivocada.`, 'se retira la etiqueta y se usa la de esta OT. Presione Siguiente.'],
+  }[tipo];
+  R.error = {
+    titulo: `Error provocado: ${que[0]}`,
+    terminal: r?.mensaje,
+    texto: `${que[1]} La terminal rechaza la bolsa (CP 07 en rojo), pero la máquina no se bloquea; el rechazo queda guardado en el MES. La bolsa no cuenta: el contador sigue en ${k} de ${info.totalBolsas}.`,
+    arreglo: que[2],
+  };
+}
+
+async function alternarSenal() {
+  const cortar = !vista?.sinSenal;
+  $('#m-senal-btn').click();
+  await pausa(600);
+  R.error = cortar
+    ? { tipo: 'aviso', titulo: 'Señal LoRa cortada', texto: 'Es como si la terminal quedara fuera del alcance de la antena. Siga con Siguiente: la terminal valida igual, porque lo decide ella misma, y lo que no puede enviar se guarda en "Memoria de la terminal" (abajo a la izquierda) y en la última línea de la pantalla.', arreglo: 'al devolver la señal, la terminal reenvía todo lo guardado, en orden. No se pierde nada.' }
+    : { tipo: 'bien', titulo: 'Señal LoRa restablecida', texto: 'La terminal está reenviando lo que tenía en memoria. Fíjese cómo baja el contador de memoria hasta quedar vacío y cómo llegan los eventos al MES.' };
+}
+
+function opcionesError(paso) {
+  if (!info?.manual || R.ocupado) return [];
+  const ops = [];
+  const hay = (titulo, pred) => grupo(titulo).some((x) => x.malo && (!pred || pred(x)));
+  if (!info.bloqueado && ['gafete', 'ot', 'qr'].includes(paso)) {
+    ops.push(['Gafete no habilitado', () => arranqueConError('gafete')]);
+    if (hay('Carpeta de la OT')) ops.push(['Carpeta de otra máquina', () => arranqueConError('ot')]);
+    ops.push(['QR de la máquina vecina', () => arranqueConError('qr')]);
+  }
+  if (['bolsa', 'charola', 'resto'].includes(paso) && info.bascula) {
+    ops.push(['Bolsa fuera de peso', () => bolsaConError('peso')]);
+    if (hay('Etiquetas correlativas del sobre', (x) => x.nota === 'se salta una')) ops.push(['Saltarse una etiqueta', () => bolsaConError('salto')]);
+    if (hay('Etiquetas correlativas del sobre', (x) => x.nota === 'de otra OT')) ops.push(['Etiqueta de otra OT', () => bolsaConError('ajena')]);
+  }
+  if (['gafete', 'ot', 'qr', 'bolsa', 'charola', 'resto'].includes(paso)) ops.push([vista?.sinSenal ? 'Devolver la señal LoRa' : 'Cortar la señal LoRa', alternarSenal]);
+  return ops;
+}
+
+function pintarErrores(paso) {
+  const ops = opcionesError(paso);
+  const clave = ops.map((o) => o[0]).join('|');
+  if (clave === R.clavesErr) return; // no rehacer los botones en cada refresco: se perderían clics
+  R.clavesErr = clave;
+  const caja = $('#r-errores');
+  caja.hidden = !ops.length;
+  caja.replaceChildren(
+    h('span', { text: 'Mostrar un error:' }),
+    ...ops.map(([texto, fn]) => {
+      const b = h('button', { type: 'button', class: 'btn-error', text: texto });
+      b.onclick = async () => {
+        if (R.ocupado) return;
+        R.ocupado = true;
+        pintarRecorrido();
+        try {
+          await fn();
+        } finally {
+          R.ocupado = false;
+          await cargarEtiquetas();
+        }
+      };
+      return b;
+    }));
+}
