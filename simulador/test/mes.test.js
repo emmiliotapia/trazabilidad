@@ -26,7 +26,7 @@ function bolsaHasta(cp, k = 1, seq0 = 100) {
 const enCaja = (k, caja = 'CJ-000001', seq = 1) => mes.procesarEvento(evento({ nodo: 'SM1-01', seq, cp: 11, datos: { ot: OT, bolsa: k, caja, posicion: k, total: 4, operador: 'C11' } }));
 
 test('un evento repetido por la radio (mismo nodo y seq) se guarda una sola vez', () => {
-  const ev = evento({ seq: 5, cp: 7, datos: { ot: OT, bolsa: 1, peso: 1250 } });
+  const ev = evento({ seq: 5, cp: 7, datos: { ot: OT, bolsa: 1, peso: 1250, operador: 'E1' } });
   mes.procesarEvento(ev);
   mes.procesarEvento(ev);
   assert.equal(mes.stats.eventos, 1);
