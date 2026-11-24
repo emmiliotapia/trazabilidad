@@ -158,7 +158,7 @@ export class MES extends EventEmitter {
     if (ev.diferido) this.stats.diferidos++;
 
     if (ev.resultado === 'FAIL') {
-      this.alerta({ nivel: NIVEL_AMBAR.has(ev.codigo) ? 'ambar' : 'rojo', origen: 'nodo', cp: ev.cp, nodo: ev.nodo, ot: d.ot, codigo: ev.codigo, mensaje: `${FALLA_TEXTO[ev.codigo] ?? ev.codigo}${ref ? ` · ${ref}` : ''}` });
+      this.alerta({ nivel: NIVEL_AMBAR.has(ev.codigo) ? 'ambar' : 'rojo', origen: 'nodo', cp: ev.cp, nodo: ev.nodo, ot: d.ot, codigo: ev.codigo, diferido: !!ev.diferido, ts_evento: ev.ts_nodo, mensaje: `${FALLA_TEXTO[ev.codigo] ?? ev.codigo}${ref ? ` · ${ref}` : ''}` });
     } else {
       const h = this[`cp${ev.cp}`];
       if (h) h.call(this, d, ev);

@@ -1,7 +1,28 @@
 # 04 · Bitácora
 
-> **Última actualización:** 2026-11-23
+> **Última actualización:** 2026-11-24
 > Lo más reciente va arriba.
+
+## 2026-11-24 (voceo por conmutador)
+
+**Hecho**
+- Carpeta `voceo/`: catálogo de avisos (8 roles × inyectoras y estaciones, más 13 avisos generales; 412 en total) y `generar.mjs` para crear los MP3 con ElevenLabs. Opción `--muestra` con 53 avisos.
+- MES: módulo `src/mes/voceo.js`. Decide qué alertas se anuncian y a quién se llama, y publica en `aseti/p1/voceo` para el servidor del conmutador (Fanvil). Reglas: solo códigos de la tabla, no vocea eventos atrasados más de 2 min, no repite el mismo llamado antes de 5 min, y vuelve a vocear si la máquina sigue bloqueada a los 5 y 10 min (D18).
+- Panel: sección «Voceo por conmutador». El navegador hace de conmutador de prueba (timbre + MP3, o voz del navegador si falta el MP3), botón «Vocear ahora» y la lista de lo que se voceó, lo que no y por qué. El menú de fallas dice a quién vocea cada una.
+
+- Voz elegida: Ana María (mexicana, ElevenLabs). Generados los 53 avisos de la muestra.
+- Panel: pestaña **Configuración** (colores de estado del cliente en RGB o hex, nombres de estado, nombre de planta, color de barra, colores de CP, tiempos y tabla de qué alerta llama a quién). Se guarda en `datos/ajustes.json` y se aplica en vivo en todos los paneles.
+- **Mantenimiento ASETI** en `/aseti.html`: con clave (`ASETI_TOKEN` o `datos/aseti-token.txt`), bloqueo tras 5 intentos, diagnóstico, acciones fijas (integridad, respaldo, WAL, desbloquear terminales, señal, fallas, prueba de voceo, restablecer configuración) y auditoría en `datos/auditoria.log`. No ejecuta comandos arbitrarios.
+- Docker: volumen `trazabilidad_datos` para no perder ajustes, clave y auditoría.
+- Se integraron los 3 commits del 2026-11-23 que estaban en GitHub y no en esta copia (placa ESP32, recorrido guiado, barra de paros, índices). Los tonos de la barra de paros y del recorrido ahora salen de los colores de estado.
+
+**Pendiente**
+- Que el cliente pase sus colores y los cargue en Configuración.
+- Decidir si la pestaña Configuración también pide clave en el VPS.
+- Llevar el voceo completo al VPS: copiar `voceo/` (catálogo y MP3) y montarla en el contenedor.
+- Generar los 412 avisos completos (hace falta plan Starter de ElevenLabs) y convertirlos a 8 kHz si el conmutador lo pide.
+- Antes de trabajar, `git pull`: hay cambios que llegan desde otras herramientas.
+- Confirmar con la planta qué alerta llama a quién (tabla en `docs/05`, sección 5.1) y el formato de audio que acepta el conmutador.
 
 ## 2026-11-23 (terminal ESP32 y recorrido guiado)
 

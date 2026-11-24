@@ -4,3 +4,7 @@
 # Sistema
 .DS_Store
 Thumbs.db
+
+# Voceo: llave de ElevenLabs y audios generados
+voceo/.env
+voceo/salida/

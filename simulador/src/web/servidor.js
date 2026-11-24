@@ -6,11 +6,11 @@ import { readFile } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
 import mqtt from 'mqtt';
 import { FALLAS } from '../sim/catalogo.js';
-import { CAMPOS, TIPO, FALLA_NOMBRE, CMD_NOMBRE } from '../protocolo/trama.js';
+import { CAMPOS, TIPO, FALLA_NOMBRE, CMD_NOMBRE, FALLA_TEXTO } from '../protocolo/trama.js';
 
-const TIPOS = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml' };
+const TIPOS = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.mp3': 'audio/mpeg' };
 
-export async function iniciarWeb({ puerto, host, carpeta, mqttUrl, prefijo, reloj, canal, puente, mes, sim, nodos, cfg }) {
+export async function iniciarWeb({ ajustes, mantenimiento, puerto, host, carpeta, carpetaAudio, voceo, mqttUrl, prefijo, reloj, canal, puente, mes, sim, nodos, cfg }) {
   const clientes = new Set();
   const enviar = (tipo, datos) => {
     const msg = `event: ${tipo}\ndata: ${JSON.stringify(datos)}\n\n`;
@@ -31,6 +31,7 @@ export async function iniciarWeb({ puerto, host, carpeta, mqttUrl, prefijo, relo
     enviar('mqtt', { topico: topico.slice(prefijo.length + 1), json, ts: reloj.iso() });
   });
   canal.on('trama', (t) => enviar('aire', t));
+  ajustes.on('cambio', (v) => enviar('ajustes', v));
   mes.on('evento', (ev) => ev.seq != null && enviar('mes', { nodo: ev.nodo, seq: ev.seq, cp: ev.cp, resultado: ev.resultado, codigo: ev.codigo, diferido: ev.diferido }));
   mes.on('duplicado', (ev) => enviar('mes', { nodo: ev.nodo, seq: ev.seq, cp: ev.cp, duplicado: true }));
 
@@ -45,6 +46,7 @@ export async function iniciarWeb({ puerto, host, carpeta, mqttUrl, prefijo, relo
     mes: mes.resumen(),
     bitacora: sim.bitacora.slice(0, 25),
     fallasPendientes: sim.fallas,
+    voceo: { historial: voceo.historial, stats: voceo.stats, abiertos: [...voceo.abiertos.keys()] },
     intervaloBolsaMs: cfg.produccion.intervaloBolsaMs,
   });
   const timer = setInterval(() => clientes.size && enviar('estado', estado()), 800);
@@ -54,7 +56,7 @@ export async function iniciarWeb({ puerto, host, carpeta, mqttUrl, prefijo, relo
     try {
       if (url.pathname === '/api/stream') {
         res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive', 'X-Accel-Buffering': 'no' });
-        res.write(`event: inicio\ndata: ${JSON.stringify({ prefijo, fallas: FALLAS, mqtt: mqttUrl, campos: CAMPOS, tipos: TIPO, fallasCodigo: FALLA_NOMBRE, cmds: CMD_NOMBRE })}\n\n`);
+        res.write(`event: inicio\ndata: ${JSON.stringify({ prefijo, fallas: FALLAS, mqtt: mqttUrl, campos: CAMPOS, tipos: TIPO, fallasCodigo: FALLA_NOMBRE, cmds: CMD_NOMBRE, avisos: voceo.catalogo(), ajustes: ajustes.get(), textosFalla: FALLA_TEXTO })}\n\n`);
         res.write(`event: estado\ndata: ${JSON.stringify(estado())}\n\n`);
         clientes.add(res);
         req.on('close', () => clientes.delete(res));
@@ -81,9 +83,38 @@ export async function iniciarWeb({ puerto, host, carpeta, mqttUrl, prefijo, relo
         const f = acciones[c.accion];
         return json(res, f ? 200 : 400, f ? f() : { ok: false, mensaje: 'acción desconocida' });
       }
+      if (url.pathname === '/api/ajustes') {
+        if (req.method === 'GET') return json(res, 200, ajustes.get());
+        if (req.method === 'PUT') return json(res, 200, ajustes.guardar(JSON.parse((await leerCuerpo(req)) || '{}')));
+      }
+      // Mantenimiento ASETI: todo con clave (ver src/aseti/mantenimiento.js)
+      if (url.pathname.startsWith('/api/aseti/')) {
+        const no = mantenimiento.autorizar(req);
+        if (no) return json(res, no.codigo, { error: no.error });
+        const ruta = url.pathname.slice('/api/aseti/'.length);
+        if (ruta === 'diagnostico') return json(res, 200, mantenimiento.diagnostico());
+        if (ruta === 'diagnostico.json') {
+          res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Content-Disposition': `attachment; filename="diagnostico-${new Date().toISOString().slice(0, 19).replace(/:/g, '')}.json"` });
+          return res.end(JSON.stringify(mantenimiento.diagnostico(), null, 2));
+        }
+        if (ruta === 'acciones') return json(res, 200, { acciones: mantenimiento.acciones(), auditoria: mantenimiento.auditoria() });
+        if (ruta === 'accion' && req.method === 'POST') {
+          const { id } = JSON.parse((await leerCuerpo(req)) || '{}');
+          return json(res, 200, await mantenimiento.ejecutar(id, req));
+        }
+        return json(res, 404, { error: 'no encontrado' });
+      }
       if (url.pathname === '/api/control' && req.method === 'POST') {
         const cuerpo = JSON.parse((await leerCuerpo(req)) || '{}');
         return json(res, 200, controlar(cuerpo));
+      }
+      // audios del voceo (voceo/salida)
+      if (url.pathname.startsWith('/voceo/')) {
+        const nombre = decodeURIComponent(url.pathname.slice(7));
+        if (!/^[\w-]+\.mp3$/.test(nombre)) return json(res, 400, { error: 'nombre inválido' });
+        const audio = await readFile(join(carpetaAudio, nombre));
+        res.writeHead(200, { 'Content-Type': 'audio/mpeg', 'Cache-Control': 'no-cache' });
+        return res.end(audio);
       }
       // estáticos
       const ruta = url.pathname === '/' ? '/index.html' : url.pathname;
@@ -111,6 +142,11 @@ export async function iniciarWeb({ puerto, host, carpeta, mqttUrl, prefijo, relo
         return { ok: true };
       case 'falla':
         return { ok: sim.inyectar(c.tipo, c.maquina || null) };
+      case 'probarVoceo': {
+        if (!voceo.catalogo().some((a) => a.clave === c.clave)) return { ok: false, error: 'aviso desconocido' };
+        sim.log(`Prueba de voceo: ${c.clave}`);
+        return { ok: true, aviso: voceo.vocear(c.clave) };
+      }
       case 'sinSenal': {
         const n = todos().find((x) => x.nombre === c.nodo);
         if (!n) return { ok: false };
@@ -142,10 +178,17 @@ function json(res, codigo, obj) {
   res.end(JSON.stringify(obj));
 }
 
+// Cuerpo de la petición, con tope de 64 KB
 function leerCuerpo(req) {
-  return new Promise((ok) => {
+  return new Promise((ok, mal) => {
     let d = '';
-    req.on('data', (c) => (d += c));
+    req.on('data', (c) => {
+      d += c;
+      if (d.length > 65536) {
+        mal(new Error('cuerpo demasiado grande'));
+        req.destroy();
+      }
+    });
     req.on('end', () => ok(d));
   });
 }

@@ -7,9 +7,15 @@ services:
     restart: unless-stopped
     environment:
       - VELOCIDAD=10
+      # - ASETI_TOKEN=...   clave de mantenimiento; si no se pone, se crea en datos/aseti-token.txt
     mem_limit: 256m
+    volumes:
+      - trazabilidad_datos:/app/datos   # ajustes del panel, clave de mantenimiento y auditoría
     networks:
       - root_default
+
+volumes:
+  trazabilidad_datos:
 
 networks:
   root_default:

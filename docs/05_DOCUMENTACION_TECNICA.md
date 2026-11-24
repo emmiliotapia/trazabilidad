@@ -1,6 +1,6 @@
 # 05 · Documentación técnica
 
-> **Última actualización:** 2026-11-21
+> **Última actualización:** 2026-11-24
 > **Aplica a:** simulador v0.1 (`simulador/`) y al diseño del sistema real que lo reemplaza pieza por pieza.
 > **Público:** quien programe el firmware, el servidor o la integración con ERP/WMS.
 
@@ -155,6 +155,7 @@ Prefijo configurable; por defecto `aseti/p1`.
 | `aseti/p1/nodo/{nodo}/cmd_ack` | puente | 1 | Respuesta de la terminal o `SIN_RESPUESTA` |
 | `aseti/p1/mes/evento` | MES | 0 | Acciones de oficina (CP 03, CP 05) |
 | `aseti/p1/alerta` | MES | 0 | Alertas de gate local o central |
+| `aseti/p1/voceo` | MES | 1 | Aviso que el conmutador debe reproducir (ver 5.1) |
 | `aseti/p1/erp/despacho` | MES | 1 | Cierre de trazabilidad en CP 16 |
 | `aseti/p1/gateway/traza` | puente | 0 | Trama en hex + JSON traducido (diagnóstico) |
 | `aseti/p1/gateway/rechazo` | puente | 0 | Tramas con firma inválida o nodo desconocido |
@@ -183,6 +184,32 @@ Prefijo configurable; por defecto `aseti/p1`.
 { "tarima": "TR-0003", "orden_embarque": "OE-2611-003", "numero_parte": "TAP-28-PP", "puerta": "P-4",
   "cajas": ["CJ-000007", "CJ-000009", "CJ-000012"], "ots": ["OT-2611-004"], "estatus_trazabilidad": "COMPLETO", "ts_salida": "…" }
 ```
+
+### 5.1 Voceo por conmutador
+
+El módulo `src/mes/voceo.js` escucha `alerta`, `nodo/+/evento` y `nodo/+/cmd_ack`, y publica en `voceo` el aviso que hay que tocar en los Fanvil. Los textos y MP3 salen de la carpeta `voceo/` (`VOCEO_DIR` para cambiarla).
+
+```json
+{ "id": "9518d3f9-…", "ts": "2026-11-24T16:34:52Z", "rol": "supervisor", "destino": "L2-INY-07",
+  "archivo": "supervisor__L2-INY-07.mp3", "texto": "Supervisor de producción, favor de acudir a línea dos, inyectora siete.",
+  "repetir": 2, "escalamiento": 0,
+  "alerta": { "codigo": "OPERADOR_NO_HABILITADO", "cp": 6, "nodo": "L2-INY-07", "ot": "OT-2611-018", "nivel": "rojo" } }
+```
+
+`escalamiento` es 0 en el primer aviso y 1, 2 cuando se repite porque la máquina sigue bloqueada. `alerta` es `null` en las pruebas manuales desde el panel.
+
+| Código | A quién | Lugar |
+|---|---|---|
+| `OPERADOR_NO_HABILITADO`, `QR_MAQUINA_INCORRECTO`, `OT_NO_ASIGNADA`, `NODO_BLOQUEADO` | Supervisor (con escalamiento si es CP 06) | La inyectora |
+| `DEFECTO_CRITICO` | Calidad | La inyectora |
+| `CERTIFICADO_INVALIDO` | Calidad | Materia prima |
+| `RESINA_INCORRECTA` | Supervisor | Mezanina |
+| `GATE_PREVIO_NO_PASS` | Supervisor | La estación que lo detectó |
+| `BOLSA_OTRA_OT`, `DUPLICADO` | Calidad | Mesa de SM1 |
+| `SKU_NO_COINCIDE`, `TARIMA_INCOMPLETA` | Supervisor | Puesto PT (la cámara VIS-01 se vocea como embarque) |
+| `PESO_FUERA_TOLERANCIA`, `SECUENCIA_ROTA`, `CAJA_SIN_ENCINTAR`, `CAJA_INCOMPLETA`, `CAJA_LLENA`, `CAMARA_NO_CONFIRMA` | No se vocea, solo panel | — |
+
+Reglas: no se vocea un evento atrasado (búfer de la terminal) de más de 2 min; el mismo llamado no se repite antes de 5 min; un bloqueo de CP 06 se vuelve a vocear a los 5 y 10 min si no llega el `cmd_ack` de `DESBLOQUEAR` ni un CP 06 en PASS. Todos los tiempos son simulados (se aceleran con la velocidad del panel). Los tiempos, las repeticiones y qué código llama a quién se cambian en la pestaña Configuración (D19); los de esta tabla son los valores de fábrica.
 
 ## 6. Gates por checkpoint
 
@@ -241,11 +268,19 @@ ORDER BY cb.posicion;
 
 | Método y ruta | Uso |
 |---|---|
-| `GET /api/stream` | Flujo SSE: `inicio`, `estado` (cada 0.8 s), `aire`, `traza`, `mqtt`, `mes` |
+| `GET /api/stream` | Flujo SSE: `inicio` (incluye catálogo de avisos y ajustes), `estado` (cada 0.8 s), `aire`, `traza`, `mqtt`, `mes`, `ajustes` (cuando alguien guarda la configuración) |
 | `GET /api/genealogia?id=` | Genealogía y eventos de una OT, bolsa, caja, tarima o lote |
-| `POST /api/control` | `velocidad`, `perdida`, `intervalo`, `falla`, `sinSenal`, `conSenal` |
+| `POST /api/control` | `velocidad`, `perdida`, `intervalo`, `falla`, `sinSenal`, `conSenal`, `probarVoceo` (`clave` del aviso) |
 | `GET /api/manual/etiquetas?maquina=` | Estado de la terminal manual y etiquetas disponibles |
 | `POST /api/manual` | `tomar`, `soltar`, `pedirOT`, `escanear`, `pesar`, `desbloquear` |
+| `GET /voceo/{archivo}.mp3` | Audio del voceo desde `voceo/salida/` (solo nombres `[A-Za-z0-9_-]+.mp3`) |
+| `GET /api/ajustes` · `PUT /api/ajustes` | Lee o guarda la configuración (`datos/ajustes.json`). El servidor parte de los valores de fábrica y descarta lo inválido: colores que no son `#rrggbb`, números fuera de rango, roles sin avisos |
+| `GET /api/aseti/diagnostico` | Diagnóstico completo (pide clave) |
+| `GET /api/aseti/diagnostico.json` | El mismo diagnóstico como archivo descargable |
+| `GET /api/aseti/acciones` | Acciones disponibles y las últimas 30 del registro de auditoría |
+| `POST /api/aseti/accion` | `{ "id": "bd_respaldo" }`: corre una acción de la lista fija |
+
+Todas las rutas `/api/aseti/*` piden `Authorization: Bearer <clave>`. Responden 401 con clave mala y 429 después de 5 intentos fallidos en un minuto desde la misma IP (bloqueo de 1 minuto). Las acciones se registran en `datos/auditoria.log` (JSON por línea). Para agregar una acción se añade una entrada en `ACCIONES` de `src/aseti/mantenimiento.js`; a propósito no existe una acción que ejecute comandos del sistema (D20).
 
 ## 9. Configuración y ejecución
 
@@ -272,6 +307,10 @@ npm run prueba -- 120     # 120 s sin panel a 40x, con fallas programadas
 | `PERDIDA` | 0.02 | Probabilidad base de perder una trama por ruido |
 | `TASA_FALLAS` | 0 | Fallas aleatorias además de las programadas |
 | `CLAVE_RED` | valor de demostración | Clave para firmar tramas |
+| `ASETI_TOKEN` | se genera en `datos/aseti-token.txt` | Clave de la página de mantenimiento |
+| `VOCEO_DIR` | `../voceo` | Carpeta con el catálogo y los MP3 del voceo |
+
+Archivos que el servidor guarda en `datos/` (no van a git): la base `trazabilidad.db` (se reinicia en cada arranque), `ajustes.json`, `aseti-token.txt`, `auditoria.log` y `respaldos/`. En Docker, `datos/` es el volumen `trazabilidad_datos`.
 
 Requiere Node.js 22.13 o superior (`node:sqlite`).
 
@@ -316,3 +355,5 @@ Los números de operadores, mesas y puestos son supuestos (D17).
 - La firma de 4 bytes detecta alteraciones y tramas ajenas, pero no evita que se reenvíe una trama vieja (*replay*). Mitigación prevista: rechazar `ts` fuera de una ventana y `seq` ya vistos.
 - El canal simulado supone un gateway de 8 canales que recibe todos a la vez y transmite sin bloquear la recepción. Un gateway real es *half-duplex*: mientras manda un ACK no escucha. Con 51 terminales conviene medirlo en campo (D16). La prueba de concepto con una Heltec como gateway (opción A) tiene un solo canal.
 - La pantalla AV de SM1 y la cámara de CP 15 se simulan como nodos LoRa; en planta usarán un equipo local (decisión D11).
+- **Voceo en Docker:** la imagen solo copia `simulador/`, así que en el contenedor no está la carpeta `voceo/`. El voceo funciona, pero los avisos se publican sin `texto`, el panel no ofrece «Vocear ahora» y no hay MP3 (los MP3 tampoco van en git). Para tenerlo completo en el servidor hay que copiar `voceo/` y montarla en el contenedor con `VOCEO_DIR`.
+- **La pestaña Configuración no pide clave**, igual que los demás controles del panel: en un servidor público cualquiera con el enlace puede cambiar colores y reglas del voceo.

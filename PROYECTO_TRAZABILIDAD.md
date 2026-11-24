@@ -1,6 +1,6 @@
 # Proyecto de Trazabilidad · Inyección de plástico (documento consolidado)
 
-> Generado el 2026-11-21 18:20. Este archivo se arma a partir de docs/. No editarlo a mano.
+> Generado el 2026-11-24 09:12. Este archivo se arma a partir de docs/. No editarlo a mano.
 
 
 ---
@@ -323,14 +323,53 @@ En `simulador/` está la arquitectura completa funcionando en software (ver `sim
 | D15 | 2026-11-21 | Nombres `L1-INY-01`…; ID de nodo = línea × 100 + número; estaciones compartidas en el 900 | Aceptada | Con 51 máquinas los ID 30–51 de las estaciones chocaban con las inyectoras; así la línea se lee en el número |
 | D16 | 2026-11-21 | **Un solo gateway multicanal**: un canal por línea, otro para MP/mezanina/PT/cámara y dos para las mesas de SM1 | Propuesta | Separa el tráfico de cada línea; en simulación las colisiones bajan de ~19 % a ~8 %. Requiere gateway de 8 canales (SX1302), no una Heltec sola |
 | D17 | 2026-11-21 | Capacidad de estaciones compartidas en la simulación: 3 operadores de resina, 4 mesas SM1, 2 puestos de paletizado | Supuesto | Con 1 operador, 2 mesas y 1 puesto, 51 máquinas se quedaban esperando resina y la fila de pre-envío crecía. Validar con la planta (pregunta 9) |
+| D18 | 2026-11-24 | **El MES decide el voceo** y publica en `aseti/p1/voceo` qué MP3 tocar; el servidor del conmutador solo reproduce | Propuesta | Solo el MES sabe si un evento llegó atrasado, si ya se voceó o si la máquina sigue bloqueada. Así el servidor del conmutador no lleva lógica de planta |
+| D19 | 2026-11-24 | Colores de estado, nombres, colores de CP y reglas del voceo se configuran desde el panel y se guardan en el servidor (`datos/ajustes.json`) | Aceptada | El cliente tiene su propio código de colores y todavía no lo entrega; así se cambia sin tocar código y lo ven todos los paneles |
+| D20 | 2026-11-24 | Soporte ASETI con **diagnóstico y acciones fijas protegidas con clave**, no un acceso que ejecute comandos libres | Aceptada | Una página que corre cualquier comando es la misma entrada que usaría un intruso. Las acciones fijas cubren el soporte diario y quedan auditadas |
 
 
 ---
 
 # 04 · Bitácora
 
-> **Última actualización:** 2026-11-21
+> **Última actualización:** 2026-11-24
 > Lo más reciente va arriba.
+
+## 2026-11-24 (voceo por conmutador)
+
+**Hecho**
+- Carpeta `voceo/`: catálogo de avisos (8 roles × inyectoras y estaciones, más 13 avisos generales; 412 en total) y `generar.mjs` para crear los MP3 con ElevenLabs. Opción `--muestra` con 53 avisos.
+- MES: módulo `src/mes/voceo.js`. Decide qué alertas se anuncian y a quién se llama, y publica en `aseti/p1/voceo` para el servidor del conmutador (Fanvil). Reglas: solo códigos de la tabla, no vocea eventos atrasados más de 2 min, no repite el mismo llamado antes de 5 min, y vuelve a vocear si la máquina sigue bloqueada a los 5 y 10 min (D18).
+- Panel: sección «Voceo por conmutador». El navegador hace de conmutador de prueba (timbre + MP3, o voz del navegador si falta el MP3), botón «Vocear ahora» y la lista de lo que se voceó, lo que no y por qué. El menú de fallas dice a quién vocea cada una.
+
+- Voz elegida: Ana María (mexicana, ElevenLabs). Generados los 53 avisos de la muestra.
+- Panel: pestaña **Configuración** (colores de estado del cliente en RGB o hex, nombres de estado, nombre de planta, color de barra, colores de CP, tiempos y tabla de qué alerta llama a quién). Se guarda en `datos/ajustes.json` y se aplica en vivo en todos los paneles.
+- **Mantenimiento ASETI** en `/aseti.html`: con clave (`ASETI_TOKEN` o `datos/aseti-token.txt`), bloqueo tras 5 intentos, diagnóstico, acciones fijas (integridad, respaldo, WAL, desbloquear terminales, señal, fallas, prueba de voceo, restablecer configuración) y auditoría en `datos/auditoria.log`. No ejecuta comandos arbitrarios.
+- Docker: volumen `trazabilidad_datos` para no perder ajustes, clave y auditoría.
+- Se integraron los 3 commits del 2026-11-23 que estaban en GitHub y no en esta copia (placa ESP32, recorrido guiado, barra de paros, índices). Los tonos de la barra de paros y del recorrido ahora salen de los colores de estado.
+
+**Pendiente**
+- Que el cliente pase sus colores y los cargue en Configuración.
+- Decidir si la pestaña Configuración también pide clave en el VPS.
+- Llevar el voceo completo al VPS: copiar `voceo/` (catálogo y MP3) y montarla en el contenedor.
+- Generar los 412 avisos completos (hace falta plan Starter de ElevenLabs) y convertirlos a 8 kHz si el conmutador lo pide.
+- Antes de trabajar, `git pull`: hay cambios que llegan desde otras herramientas.
+- Confirmar con la planta qué alerta llama a quién (tabla en `docs/05`, sección 5.1) y el formato de audio que acepta el conmutador.
+
+## 2026-11-23 (terminal ESP32 y recorrido guiado)
+
+**Hecho**
+- La pestaña Terminal ahora dibuja la placa ESP32 LoRa (pantalla OLED con línea de señal y memoria, LED de transmisión, antena), el QR fijo de cada máquina, el lector GM65 y la báscula.
+- Nuevo modo **Recorrido guiado de una OT**: un botón Siguiente lleva la OT de la solicitud al despacho, muestra cómo se genera (CP 01–05 y ficha de la OT) y sigue la OT por la planta hasta CP 16. El paso actual se deduce del estado real de la máquina.
+- **Mostrar un error** en el recorrido: gafete no habilitado, carpeta de otra máquina, QR vecino (bloqueo y supervisor), bolsa fuera de peso, etiqueta saltada, etiqueta de otra OT (rechazo) y corte de señal LoRa.
+- El modo anterior queda como **Modo libre y misiones**, sin cambios.
+- `/api/manual/etiquetas` devuelve además fase, si la OT está solicitada, si la máquina arrancó, la bolsa siguiente, el total, bolsas por charola y el QR.
+- Manual de usuario, sección 5, reescrita.
+- **Barra de paros en vivo** bajo las pestañas: máquinas detenidas, rechazos recientes y nodos sin señal, con su CP, causa, tiempo y accesos a la planta y a la terminal. El CP y la máquina del paro se marcan en rojo.
+- Las fallas del recorrido se presentan como tarjetas con su efecto (detiene la máquina, rechaza la bolsa, guarda en memoria).
+
+**Pendiente**
+- Hacer que el QR dibujado sea un QR legible con el teléfono.
 
 ## 2026-11-21 (tres líneas)
 
@@ -411,7 +450,7 @@ En `simulador/` está la arquitectura completa funcionando en software (ver `sim
 
 # 05 · Documentación técnica
 
-> **Última actualización:** 2026-11-21
+> **Última actualización:** 2026-11-24
 > **Aplica a:** simulador v0.1 (`simulador/`) y al diseño del sistema real que lo reemplaza pieza por pieza.
 > **Público:** quien programe el firmware, el servidor o la integración con ERP/WMS.
 
@@ -566,6 +605,7 @@ Prefijo configurable; por defecto `aseti/p1`.
 | `aseti/p1/nodo/{nodo}/cmd_ack` | puente | 1 | Respuesta de la terminal o `SIN_RESPUESTA` |
 | `aseti/p1/mes/evento` | MES | 0 | Acciones de oficina (CP 03, CP 05) |
 | `aseti/p1/alerta` | MES | 0 | Alertas de gate local o central |
+| `aseti/p1/voceo` | MES | 1 | Aviso que el conmutador debe reproducir (ver 5.1) |
 | `aseti/p1/erp/despacho` | MES | 1 | Cierre de trazabilidad en CP 16 |
 | `aseti/p1/gateway/traza` | puente | 0 | Trama en hex + JSON traducido (diagnóstico) |
 | `aseti/p1/gateway/rechazo` | puente | 0 | Tramas con firma inválida o nodo desconocido |
@@ -594,6 +634,32 @@ Prefijo configurable; por defecto `aseti/p1`.
 { "tarima": "TR-0003", "orden_embarque": "OE-2611-003", "numero_parte": "TAP-28-PP", "puerta": "P-4",
   "cajas": ["CJ-000007", "CJ-000009", "CJ-000012"], "ots": ["OT-2611-004"], "estatus_trazabilidad": "COMPLETO", "ts_salida": "…" }
 ```
+
+### 5.1 Voceo por conmutador
+
+El módulo `src/mes/voceo.js` escucha `alerta`, `nodo/+/evento` y `nodo/+/cmd_ack`, y publica en `voceo` el aviso que hay que tocar en los Fanvil. Los textos y MP3 salen de la carpeta `voceo/` (`VOCEO_DIR` para cambiarla).
+
+```json
+{ "id": "9518d3f9-…", "ts": "2026-11-24T16:34:52Z", "rol": "supervisor", "destino": "L2-INY-07",
+  "archivo": "supervisor__L2-INY-07.mp3", "texto": "Supervisor de producción, favor de acudir a línea dos, inyectora siete.",
+  "repetir": 2, "escalamiento": 0,
+  "alerta": { "codigo": "OPERADOR_NO_HABILITADO", "cp": 6, "nodo": "L2-INY-07", "ot": "OT-2611-018", "nivel": "rojo" } }
+```
+
+`escalamiento` es 0 en el primer aviso y 1, 2 cuando se repite porque la máquina sigue bloqueada. `alerta` es `null` en las pruebas manuales desde el panel.
+
+| Código | A quién | Lugar |
+|---|---|---|
+| `OPERADOR_NO_HABILITADO`, `QR_MAQUINA_INCORRECTO`, `OT_NO_ASIGNADA`, `NODO_BLOQUEADO` | Supervisor (con escalamiento si es CP 06) | La inyectora |
+| `DEFECTO_CRITICO` | Calidad | La inyectora |
+| `CERTIFICADO_INVALIDO` | Calidad | Materia prima |
+| `RESINA_INCORRECTA` | Supervisor | Mezanina |
+| `GATE_PREVIO_NO_PASS` | Supervisor | La estación que lo detectó |
+| `BOLSA_OTRA_OT`, `DUPLICADO` | Calidad | Mesa de SM1 |
+| `SKU_NO_COINCIDE`, `TARIMA_INCOMPLETA` | Supervisor | Puesto PT (la cámara VIS-01 se vocea como embarque) |
+| `PESO_FUERA_TOLERANCIA`, `SECUENCIA_ROTA`, `CAJA_SIN_ENCINTAR`, `CAJA_INCOMPLETA`, `CAJA_LLENA`, `CAMARA_NO_CONFIRMA` | No se vocea, solo panel | — |
+
+Reglas: no se vocea un evento atrasado (búfer de la terminal) de más de 2 min; el mismo llamado no se repite antes de 5 min; un bloqueo de CP 06 se vuelve a vocear a los 5 y 10 min si no llega el `cmd_ack` de `DESBLOQUEAR` ni un CP 06 en PASS. Todos los tiempos son simulados (se aceleran con la velocidad del panel). Los tiempos, las repeticiones y qué código llama a quién se cambian en la pestaña Configuración (D19); los de esta tabla son los valores de fábrica.
 
 ## 6. Gates por checkpoint
 
@@ -652,11 +718,19 @@ ORDER BY cb.posicion;
 
 | Método y ruta | Uso |
 |---|---|
-| `GET /api/stream` | Flujo SSE: `inicio`, `estado` (cada 0.8 s), `aire`, `traza`, `mqtt`, `mes` |
+| `GET /api/stream` | Flujo SSE: `inicio` (incluye catálogo de avisos y ajustes), `estado` (cada 0.8 s), `aire`, `traza`, `mqtt`, `mes`, `ajustes` (cuando alguien guarda la configuración) |
 | `GET /api/genealogia?id=` | Genealogía y eventos de una OT, bolsa, caja, tarima o lote |
-| `POST /api/control` | `velocidad`, `perdida`, `intervalo`, `falla`, `sinSenal`, `conSenal` |
+| `POST /api/control` | `velocidad`, `perdida`, `intervalo`, `falla`, `sinSenal`, `conSenal`, `probarVoceo` (`clave` del aviso) |
 | `GET /api/manual/etiquetas?maquina=` | Estado de la terminal manual y etiquetas disponibles |
 | `POST /api/manual` | `tomar`, `soltar`, `pedirOT`, `escanear`, `pesar`, `desbloquear` |
+| `GET /voceo/{archivo}.mp3` | Audio del voceo desde `voceo/salida/` (solo nombres `[A-Za-z0-9_-]+.mp3`) |
+| `GET /api/ajustes` · `PUT /api/ajustes` | Lee o guarda la configuración (`datos/ajustes.json`). El servidor parte de los valores de fábrica y descarta lo inválido: colores que no son `#rrggbb`, números fuera de rango, roles sin avisos |
+| `GET /api/aseti/diagnostico` | Diagnóstico completo (pide clave) |
+| `GET /api/aseti/diagnostico.json` | El mismo diagnóstico como archivo descargable |
+| `GET /api/aseti/acciones` | Acciones disponibles y las últimas 30 del registro de auditoría |
+| `POST /api/aseti/accion` | `{ "id": "bd_respaldo" }`: corre una acción de la lista fija |
+
+Todas las rutas `/api/aseti/*` piden `Authorization: Bearer <clave>`. Responden 401 con clave mala y 429 después de 5 intentos fallidos en un minuto desde la misma IP (bloqueo de 1 minuto). Las acciones se registran en `datos/auditoria.log` (JSON por línea). Para agregar una acción se añade una entrada en `ACCIONES` de `src/aseti/mantenimiento.js`; a propósito no existe una acción que ejecute comandos del sistema (D20).
 
 ## 9. Configuración y ejecución
 
@@ -683,6 +757,10 @@ npm run prueba -- 120     # 120 s sin panel a 40x, con fallas programadas
 | `PERDIDA` | 0.02 | Probabilidad base de perder una trama por ruido |
 | `TASA_FALLAS` | 0 | Fallas aleatorias además de las programadas |
 | `CLAVE_RED` | valor de demostración | Clave para firmar tramas |
+| `ASETI_TOKEN` | se genera en `datos/aseti-token.txt` | Clave de la página de mantenimiento |
+| `VOCEO_DIR` | `../voceo` | Carpeta con el catálogo y los MP3 del voceo |
+
+Archivos que el servidor guarda en `datos/` (no van a git): la base `trazabilidad.db` (se reinicia en cada arranque), `ajustes.json`, `aseti-token.txt`, `auditoria.log` y `respaldos/`. En Docker, `datos/` es el volumen `trazabilidad_datos`.
 
 Requiere Node.js 22.13 o superior (`node:sqlite`).
 
@@ -727,13 +805,15 @@ Los números de operadores, mesas y puestos son supuestos (D17).
 - La firma de 4 bytes detecta alteraciones y tramas ajenas, pero no evita que se reenvíe una trama vieja (*replay*). Mitigación prevista: rechazar `ts` fuera de una ventana y `seq` ya vistos.
 - El canal simulado supone un gateway de 8 canales que recibe todos a la vez y transmite sin bloquear la recepción. Un gateway real es *half-duplex*: mientras manda un ACK no escucha. Con 51 terminales conviene medirlo en campo (D16). La prueba de concepto con una Heltec como gateway (opción A) tiene un solo canal.
 - La pantalla AV de SM1 y la cámara de CP 15 se simulan como nodos LoRa; en planta usarán un equipo local (decisión D11).
+- **Voceo en Docker:** la imagen solo copia `simulador/`, así que en el contenedor no está la carpeta `voceo/`. El voceo funciona, pero los avisos se publican sin `texto`, el panel no ofrece «Vocear ahora» y no hay MP3 (los MP3 tampoco van en git). Para tenerlo completo en el servidor hay que copiar `voceo/` y montarla en el contenedor con `VOCEO_DIR`.
+- **La pestaña Configuración no pide clave**, igual que los demás controles del panel: en un servidor público cualquiera con el enlace puede cambiar colores y reglas del voceo.
 
 
 ---
 
 # 06 · Manual de usuario del simulador
 
-> **Última actualización:** 2026-11-21
+> **Última actualización:** 2026-11-24
 > **Para:** supervisores, calidad, operadores y cualquier persona que quiera entender el sistema antes de instalarlo en planta.
 > **No necesita** saber programar. Para el detalle técnico vea [05_DOCUMENTACION_TECNICA.md](05_DOCUMENTACION_TECNICA.md).
 
@@ -744,7 +824,7 @@ Es una planta de inyección "de mentira" que funciona igual que funcionará la r
 Sirve para:
 
 - Ver cómo se registra cada paso (CP 01 a CP 16) y qué pasa cuando algo sale mal.
-- Ser operador: escanear etiquetas en una inyectora y ver el viaje de cada mensaje.
+- Ser operador: llevar una OT completa con el recorrido guiado, provocar errores y ver el viaje de cada mensaje.
 - Rastrear cualquier bolsa, caja o tarima hasta el lote de resina.
 
 Nada de lo que haga aquí afecta a la planta. Puede provocar todas las fallas que quiera.
@@ -769,6 +849,8 @@ Cada vez que se inicia, la planta empieza vacía. Las primeras bolsas aparecen e
 | Tarimas despachadas | Tarimas que pasaron CP 16 | Sube cada pocos minutos |
 
 **Velocidad.** 10× quiere decir que un minuto de planta dura 6 segundos. Bájela a 1× para verlo en tiempo real.
+
+**Barra de paros.** Justo debajo de las pestañas, visible en todas. En verde dice *Sin paros: el proceso fluye*. Si una máquina se detiene, rechaza algo o se queda sin señal, se pone roja o ámbar con un resumen y una tarjeta por paro: el checkpoint, la máquina, la causa, desde hace cuánto y qué se necesita para seguir. **Ver en planta** lleva a la máquina y resalta su OT; **Abrir su terminal** abre la pestaña Terminal con esa máquina. Las máquinas detenidas y sin señal se quedan hasta que se resuelven; los rechazos se muestran 20 segundos. El CP del paro también se marca en rojo en la línea de checkpoints.
 
 **Línea de checkpoints.** Debajo de las pestañas, los 16 CP en orden. Se iluminan cuando ocurre un escaneo en ese paso.
 
@@ -826,35 +908,96 @@ Si una tarjeta dice **sin señal** o muestra un número en **búfer**, la termin
 | Caja de otro número de parte | 14 | No entra a la tarima |
 | La cámara no confirma una cara | 15 | Se repite la foto; la tarima no sale hasta tener 4/4 |
 
+En el menú, cada falla dice a quién vocea (por ejemplo *vocea a supervisor a la inyectora*). Las fallas de arranque (CP 06) ocurren cuando esa inyectora arranca su siguiente OT, en unos minutos simulados.
+
 También puede **cortar la señal LoRa** de cualquier nodo por unos minutos, subir la **pérdida por ruido** o cambiar **cada cuánto sale una bolsa** para saturar la planta.
+
+### 4.1 Voceo por conmutador
+
+Debajo de las alertas. Cuando hay una falla que necesita a alguien, el sistema lo llama por altavoz: *"Supervisor de producción, favor de acudir a línea dos, inyectora siete."* En la planta lo reproduce el conmutador en las bocinas Fanvil; en el simulador, **esta computadora hace de conmutador**.
+
+1. Presione **Activar sonido en esta computadora** (el navegador no deja sonar nada sin un clic).
+2. Para oír un aviso al momento, elija **Llamar a** y **Lugar** y presione **Vocear ahora**.
+3. Para verlo con una falla real, programe *Operador no habilitado* en una inyectora y espere a que arranque.
+
+Suena un timbre y el aviso dos veces. Si ese aviso todavía no tiene grabación, lo dice la voz del navegador y lo avisa en pantalla.
+
+La lista muestra cada aviso: **Voceado**, **No se voceó** (con el motivo) o **Resuelto** (la máquina se desbloqueó). Con **Oír** se repite uno.
+
+| Motivo de "No se voceó" | Qué quiere decir |
+|---|---|
+| Solo panel | Esa alerta no llama a nadie, por ejemplo una bolsa fuera de peso |
+| Ya se voceó hace menos de 5 min | El mismo llamado ya sonó; no se repite para no saturar |
+| Llegó con atraso | La terminal estuvo sin señal y el evento llegó tarde; ya no tiene caso vocearlo |
+
+Si una máquina sigue bloqueada, se vuelve a vocear a los 5 y a los 10 minutos (aparece como *Voceado otra vez*). Los tiempos y a quién llama cada alerta se cambian en la pestaña **Configuración**.
 
 ## 5. Pestaña Terminal: sea el operador
 
-Aquí usted controla una inyectora. Las demás siguen trabajando solas.
+Aquí usted controla una inyectora. Las demás siguen trabajando solas. Arriba hay dos modos:
 
-### 5.1 Empezar
+- **Recorrido guiado de una OT** (abre por defecto): un botón **Siguiente** lleva una OT de principio a fin. Es el modo para presentar.
+- **Modo libre y misiones:** usted escanea a mano y sigue siete misiones. Es el modo para practicar.
 
-1. Elija la inyectora y presione **Tomar el control**. Su ciclo automático se pausa.
-2. Si no tiene OT, presione **Pedir OT nueva**. Planeación la crea, el almacén sube la resina, la mezanina la carga y la OT se libera. Espere a que la pantalla diga *Escanee gafete, OT y QR*. Si el botón está apagado es porque ya viene una OT en camino.
-3. Escanee haciendo clic en las **etiquetas a la mano**, escribiendo el código en el **lector** y presionando Enter, o con un lector USB real (funciona como teclado).
-4. Para terminar, presione **Regresar a automático**.
+Los dos usan la misma terminal y hacen lo mismo que haría el operador. Si cambia de modo a la mitad, la máquina sigue donde iba.
 
-### 5.2 La terminal
+### 5.1 La terminal
 
-- **Pantalla y torreta:** lo mismo que vería el operador en la máquina.
-- **Gafete · OT · QR:** se marcan conforme los escanea. Los tres en orden arrancan la máquina (CP 06).
-- **Báscula:** mueva el deslizador para elegir el peso y presione **Poner bolsa en la báscula**. Dice si el peso está dentro de tolerancia. Después escanee la etiqueta de la bolsa (CP 07).
-- **Memoria de la terminal:** cada cuadrito es un mensaje que todavía no recibe confirmación del servidor. Normalmente aparece y desaparece en un segundo. Sin señal, se acumulan (en rojo).
-- **Cortar la señal LoRa / Restablecer la señal:** simula que la máquina queda fuera de alcance.
+A la izquierda está todo lo que se instala junto a la máquina:
+
+- **Torreta:** gris sin OT, ámbar esperando el arranque, verde produciendo, rojo bloqueada.
+- **Placa ESP32 LoRa:** es la terminal. Arriba dice qué máquina es y la señal de radio (en dBm). La **pantalla** muestra lo mismo que vería el operador; la última línea dice la señal y cuántos mensajes tiene en memoria. El **LED** parpadea en rojo cuando la placa transmite y en verde cuando le llega una respuesta.
+- **Gafete · OT · QR:** se marcan conforme se escanean. Los tres en orden arrancan la máquina (CP 06).
+- **QR fijo:** el código pegado en la máquina. Cada máquina tiene el suyo. Se ilumina en verde cuando se escanea.
+- **Lector de códigos:** puede escribir un código y presionar Enter, o usar un lector USB real (funciona como teclado). La luz roja del lector se enciende al leer.
+- **Báscula:** mueva el deslizador para elegir el peso y presione **Poner bolsa en la báscula**. Después escanee la etiqueta de la bolsa (CP 07).
+- **Memoria de la terminal:** cada cuadrito es un mensaje que todavía no recibe confirmación del servidor. Normalmente aparece y desaparece en un segundo. Sin señal, se acumulan.
+
+Botones de arriba:
+
+- **Elegir una máquina libre** (modo guiado): escoge una inyectora sin OT para empezar desde cero.
+- **Tomar el control / Regresar a automático:** pausa o reanuda el ciclo automático de la máquina.
+- **Pedir OT nueva** (modo libre).
 - **Llamar al supervisor:** solo se activa cuando la terminal está bloqueada.
+- **Cortar la señal LoRa / Restablecer la señal:** simula que la máquina queda fuera de alcance.
 
-### 5.3 Las etiquetas
+### 5.2 Recorrido guiado de una OT
 
-Las que están marcadas en rojo son incorrectas a propósito: un gafete no habilitado, una OT de otra máquina, una etiqueta que se salta una. Úselas para ver cómo responde el sistema.
+A la derecha se ven los 9 pasos, la explicación del paso actual y el botón **Siguiente**, que dice exactamente lo que va a hacer (por ejemplo, *Escanear gafete E1142*). El recorrido se fija en el estado real de la máquina: si alguien escanea a mano, sigue desde donde quedó.
 
-### 5.4 Misiones
+Una **OT** (orden de trabajo) es: "haga 12 bolsas de esta pieza en esta máquina".
 
-A la derecha de la terminal se muestra una misión a la vez, con las etiquetas a la mano justo debajo. La misión se marca sola cuando la terminal registra lo que pide: aparece "¡Lograda!" con lo que aprendió y, a los 5 segundos, pasa sola a la siguiente. Los puntos de arriba muestran el avance (verde = completada); con ellos o con las flechas puede ver cualquier misión. **Ir a la misión pendiente** lo regresa a la que sigue. Son siete:
+1. **Tomar la máquina.** Use antes **Elegir una máquina libre** para ver la OT completa desde el principio.
+2. **Solicitar la OT.** Planeación la programa (CP 03), el almacén sube la resina (CP 01–02), en la mezanina la vacían en el embudo (CP 04) y el supervisor entrega el **sobre con las etiquetas numeradas** B1 a B12 (CP 05). Los checkpoints se encienden uno por uno y aparece la **ficha de la OT que se generó**: número, máquina, molde, producto, resina, lote, bolsas y peso permitido. Cuando la OT llega por radio a la terminal, presione **Continuar**.
+3. **Gafete**, 4. **Carpeta de la OT** y 5. **QR de la máquina.** Al leer el QR, la terminal revisa los tres juntos y, si cuadran, la máquina arranca y la torreta pasa a verde.
+6. **Bolsa 1: pesar y etiquetar.** La máquina va soltando piezas en una bolsa. Llena, el operador la pone en la báscula (confirma que trae las piezas correctas), le pega la siguiente etiqueta del sobre y la escanea. Las etiquetas van en orden: no se puede saltar ninguna.
+7. **Bolsas 2–4: charola 1.** La **charola** es la bandeja donde se juntan las bolsas junto a la máquina; le caben 4. No es un paso distinto: es repetir el paso 6 hasta juntar 4 bolsas, y el botón lo hace de corrido. Con 4 bolsas, inspección la recoge, revisa una de muestra (CP 08), el supervisor la libera (CP 09) y se lleva a la mesa de empaque SM1 (CP 10). Mientras, la máquina llena la siguiente.
+8. **Bolsas 5–12.** Lo mismo: dos charolas más. Con la última bolsa la OT queda completa en la máquina.
+9. **Recorre la planta.** Ya no depende de la máquina: las bolsas se meten en cajas (CP 11–12), pasan a pre-envío (CP 13), se arma la tarima (CP 14), la cámara confirma que están todas (CP 15) y se despacha (CP 16). Los checkpoints se encienden solos. **Ver la genealogía completa** abre la pestaña Trazabilidad con esa OT. **Empezar otra OT** reinicia el recorrido.
+
+Las charolas dibujadas debajo de la explicación muestran cuántas bolsas van y cuáles ya salieron a SM1.
+
+### 5.3 Mostrar errores
+
+Debajo del botón Siguiente, **Simular una falla** ofrece las fallas que aplican al paso actual; cada tarjeta dice lo que provoca (*Detiene la máquina*, *Rechaza la bolsa*, *Guarda en memoria*). Cada una hace mal el paso a propósito, aparece al instante en la barra de paros de arriba y explica, en una tarjeta, qué se hizo mal, qué mostró la terminal y cómo se corrige.
+
+| Error | Cuándo aparece | Qué pasa | Cómo se corrige |
+|---|---|---|---|
+| Gafete no habilitado | Arranque | La terminal se **bloquea**: torreta roja, no acepta más escaneos | **Llamar al supervisor** (el botón Siguiente cambia a eso). Luego se repite el arranque |
+| Carpeta de otra máquina | Arranque | Igual: bloqueo | Igual |
+| QR de la máquina vecina | Arranque | Igual: bloqueo | Igual |
+| Bolsa fuera de peso | Bolsas | La bolsa se **rechaza**; la máquina sigue y el contador no avanza | Siguiente: se vuelve a pesar y se usa la misma etiqueta |
+| Saltarse una etiqueta | Bolsas | Rechazo: "salto en la secuencia" | Siguiente: se escanea la etiqueta que tocaba |
+| Etiqueta de otra OT | Bolsas | Rechazo: la etiqueta es de otro sobre | Siguiente: se usa la etiqueta de esta OT |
+| Cortar la señal LoRa | Arranque y bolsas | La terminal sigue validando; los mensajes se guardan en su memoria | **Devolver la señal LoRa**: reenvía todo en orden, sin perder nada |
+
+Diferencia importante para explicar: un **error de arranque bloquea** la máquina (no debe producir con el operador, la OT o la máquina equivocados); un **error de bolsa solo rechaza esa bolsa** y la producción sigue. En los dos casos el rechazo queda guardado en el MES.
+
+### 5.4 Modo libre: etiquetas y misiones
+
+**Etiquetas a la mano:** haga clic en una para escanearla. Las marcadas en rojo son incorrectas a propósito: un gafete no habilitado, una OT de otra máquina, una etiqueta que se salta una.
+
+**Misiones:** se muestra una misión a la vez. Se marca sola cuando la terminal registra lo que pide: aparece "¡Lograda!" con lo que aprendió y, a los 5 segundos, pasa a la siguiente. Los puntos de arriba muestran el avance (verde = completada); con ellos o con las flechas puede ver cualquier misión. **Ir a la misión pendiente** lo regresa a la que sigue. Son siete:
 
 1. **Arranque la máquina:** gafete, OT y QR.
 2. **Registre una bolsa:** pesar y escanear.
@@ -902,23 +1045,51 @@ Escriba cualquier código y presione **Rastrear**:
 
 Abajo aparecen todos los eventos de ese código en orden, con su CP, resultado y estación. Las OT recientes se pueden abrir con un clic.
 
-## 8. Preguntas frecuentes
+## 8. Pestaña Configuración
+
+Aquí se cambia lo que el cliente quiera ver distinto, sin tocar código. Se guarda en el servidor y se aplica al momento en **todos** los paneles abiertos.
+
+- **Colores de estado:** el verde, ámbar, rojo y gris de las luces del resumen, las tarjetas, la barra de paros y las alertas. Escriba el color en RGB (`31, 138, 76`) o en hexadecimal (`#1f8a4c`), o elíjalo con el selector. También se puede cambiar el nombre de cada estado (por ejemplo *En falla* → *Paro*); los conteos de cada línea usan ese nombre. El número dentro de cada luz cambia solo a blanco o negro para que se lea.
+- **Planta:** el nombre y el subtítulo de la barra superior, y su color.
+- **Colores de los checkpoints:** el color de cada área en la línea CP 01–16.
+- **Voceo:** encenderlo o apagarlo, cuántas veces se repite cada aviso, los tiempos (no repetir, no vocear atrasados, volver a vocear) y la tabla de **qué alerta llama a quién**.
+
+Los colores se ven en vivo mientras se editan, antes de guardar. **Deshacer cambios** vuelve a lo guardado. Si un color está mal escrito, el campo se marca en rojo y no deja guardar.
+
+## 9. Mantenimiento ASETI (solo soporte)
+
+Página para el equipo de ASETI: **http://localhost:8080/aseti.html** (en el servidor, la misma dirección del panel más `/aseti.html`). No aparece en el panel.
+
+Pide la **clave de mantenimiento**. Está en la variable `ASETI_TOKEN` del servidor o, si no se puso, en el archivo `simulador/datos/aseti-token.txt`, que se crea la primera vez. Después de 5 claves equivocadas en un minuto, esa computadora espera un minuto.
+
+- **Diagnóstico:** cada chequeo en *Bien* o *Revisar* (broker MQTT, MES, puente, voceo, terminales, memoria, errores), terminales con problemas, errores recientes, la base de datos y el equipo. **Descargar diagnóstico** guarda todo en un archivo para mandarlo a soporte.
+- **Acciones de mantenimiento:** revisar la integridad de la base, respaldarla, compactar el registro WAL, desbloquear todas las terminales, restablecer la señal LoRa, quitar fallas programadas, prueba de voceo y restablecer la configuración. Las que cambian algo piden un segundo clic. Cada una queda en el **Registro de acciones** con fecha e IP.
+
+Por seguridad, la página solo corre esas acciones; no ejecuta comandos libres del servidor.
+
+## 10. Preguntas frecuentes
 
 **No veo nada en la página.** El servidor no está encendido. Ejecute `npm start` y recargue.
 
-**No encuentro cómo tomar el control.** Está en la pestaña *Terminal*, arriba a la izquierda. Si no aparece, recargue con `Ctrl + F5`.
+**No encuentro cómo tomar el control.** En la pestaña *Terminal*, en el modo **Recorrido guiado**, el botón **Siguiente** lo hace por usted; en el modo libre está arriba a la izquierda. Si no aparece, recargue con `Ctrl + F5`.
+
+**El botón Siguiente está apagado y dice "Esperando…".** La OT se está preparando (resina, mezanina, sobre). Se activa solo en unos segundos.
 
 **"Pedir OT nueva" está apagado.** La máquina ya tiene una OT en curso o en preparación. Lea el texto de ayuda debajo de los botones.
 
-**La terminal está en rojo y no acepta escaneos.** Está bloqueada por un error de arranque. Presione *Llamar al supervisor*.
+**La terminal está en rojo y no acepta escaneos.** Está bloqueada por un error de arranque. Presione *Llamar al supervisor* (en el modo guiado, el botón Siguiente hace lo mismo).
 
 **El escaneo dice correcto pero el mensaje sigue "en memoria".** La terminal ya validó; solo falta que la radio lo entregue. Si la señal está cortada, restablézcala.
 
 **¿Por qué algunos mensajes dicen "entregado con retraso"?** Se generaron sin señal y llegaron después. El sistema guarda la hora real del escaneo, no la de llegada.
 
+**Activé el sonido y no se oye nada.** Revise el volumen de la computadora. Pruebe **Vocear ahora**: si dice *falta el MP3*, se usa la voz del navegador, que en algunas computadoras viene apagada.
+
+**Cambié los colores y otra persona no los ve.** Hay que presionar **Guardar**; hasta entonces solo se ven en su pantalla.
+
 **¿Se pierden datos si se apaga el simulador?** La base de datos se guarda en `simulador/datos/`, pero cada inicio arranca una planta nueva.
 
-## 9. Glosario
+## 11. Glosario
 
 | Término | Significado |
 |---|---|
@@ -933,6 +1104,8 @@ Abajo aparecen todos los eventos de ese código en orden, con su CP, resultado y
 | ACK | Confirmación de que un mensaje llegó |
 | Búfer / memoria | Mensajes guardados en la terminal esperando confirmación |
 | Andon | Torreta de luces que indica el estado de la estación |
+| Voceo | Aviso por altavoz que llama a una persona a un lugar |
+| Conmutador | Central telefónica de la planta; reparte el audio a las bocinas y teléfonos Fanvil |
 | SM1 | Estación de empaque donde las bolsas se meten en cajas |
 | Genealogía | Cadena completa: resina → OT → bolsa → caja → tarima → embarque |
 

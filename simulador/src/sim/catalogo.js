@@ -26,19 +26,19 @@ export function operadoresDe(numMaquina) {
   return [`E${base + 1}`, `E${base + 2}`, `E${base + 3}`];
 }
 
-// Tipos de falla que se pueden inyectar desde el panel
+// Tipos de falla que se pueden inyectar desde el panel. `vocea`: a quién llama el voceo (ver src/mes/voceo.js)
 export const FALLAS = {
-  certificado: { cp: 1, texto: 'Certificado de análisis inválido (lote a cuarentena)' },
-  resina: { cp: 4, texto: 'Resina incorrecta en el embudo' },
-  operador: { cp: 6, texto: 'Operador no habilitado en el arranque' },
-  qr: { cp: 6, texto: 'QR de otra máquina en el arranque' },
+  certificado: { cp: 1, texto: 'Certificado de análisis inválido (lote a cuarentena)', vocea: 'calidad a materia prima' },
+  resina: { cp: 4, texto: 'Resina incorrecta en el embudo', vocea: 'supervisor a la mezanina' },
+  operador: { cp: 6, texto: 'Operador no habilitado en el arranque', vocea: 'supervisor a la inyectora' },
+  qr: { cp: 6, texto: 'QR de otra máquina en el arranque', vocea: 'supervisor a la inyectora' },
   peso: { cp: 7, texto: 'Bolsa fuera de tolerancia de peso' },
   secuencia: { cp: 7, texto: 'Salto en etiqueta correlativa' },
-  defecto: { cp: 8, texto: 'Defecto crítico en la inspección TEP 1' },
-  saltoCP10: { cp: 10, texto: 'Charola llega a SM1 sin registrar el retiro (CP 10)' },
-  bolsaAjena: { cp: 11, texto: 'Bolsa de otra OT en la caja' },
-  duplicada: { cp: 11, texto: 'Bolsa escaneada dos veces' },
+  defecto: { cp: 8, texto: 'Defecto crítico en la inspección TEP 1', vocea: 'calidad a la inyectora' },
+  saltoCP10: { cp: 10, texto: 'Charola llega a SM1 sin registrar el retiro (CP 10)', vocea: 'supervisor a SM1' },
+  bolsaAjena: { cp: 11, texto: 'Bolsa de otra OT en la caja', vocea: 'calidad a SM1' },
+  duplicada: { cp: 11, texto: 'Bolsa escaneada dos veces', vocea: 'calidad a SM1' },
   sinCinta: { cp: 12, texto: 'Caja sin encintar' },
-  skuAjeno: { cp: 14, texto: 'Caja de otro número de parte en la tarima' },
+  skuAjeno: { cp: 14, texto: 'Caja de otro número de parte en la tarima', vocea: 'supervisor a PT' },
   camara: { cp: 15, texto: 'La cámara no confirma una cara' },
 };

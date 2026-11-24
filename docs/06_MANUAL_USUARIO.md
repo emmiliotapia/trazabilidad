@@ -1,6 +1,6 @@
 # 06 · Manual de usuario del simulador
 
-> **Última actualización:** 2026-11-23
+> **Última actualización:** 2026-11-24
 > **Para:** supervisores, calidad, operadores y cualquier persona que quiera entender el sistema antes de instalarlo en planta.
 > **No necesita** saber programar. Para el detalle técnico vea [05_DOCUMENTACION_TECNICA.md](05_DOCUMENTACION_TECNICA.md).
 
@@ -95,7 +95,29 @@ Si una tarjeta dice **sin señal** o muestra un número en **búfer**, la termin
 | Caja de otro número de parte | 14 | No entra a la tarima |
 | La cámara no confirma una cara | 15 | Se repite la foto; la tarima no sale hasta tener 4/4 |
 
+En el menú, cada falla dice a quién vocea (por ejemplo *vocea a supervisor a la inyectora*). Las fallas de arranque (CP 06) ocurren cuando esa inyectora arranca su siguiente OT, en unos minutos simulados.
+
 También puede **cortar la señal LoRa** de cualquier nodo por unos minutos, subir la **pérdida por ruido** o cambiar **cada cuánto sale una bolsa** para saturar la planta.
+
+### 4.1 Voceo por conmutador
+
+Debajo de las alertas. Cuando hay una falla que necesita a alguien, el sistema lo llama por altavoz: *"Supervisor de producción, favor de acudir a línea dos, inyectora siete."* En la planta lo reproduce el conmutador en las bocinas Fanvil; en el simulador, **esta computadora hace de conmutador**.
+
+1. Presione **Activar sonido en esta computadora** (el navegador no deja sonar nada sin un clic).
+2. Para oír un aviso al momento, elija **Llamar a** y **Lugar** y presione **Vocear ahora**.
+3. Para verlo con una falla real, programe *Operador no habilitado* en una inyectora y espere a que arranque.
+
+Suena un timbre y el aviso dos veces. Si ese aviso todavía no tiene grabación, lo dice la voz del navegador y lo avisa en pantalla.
+
+La lista muestra cada aviso: **Voceado**, **No se voceó** (con el motivo) o **Resuelto** (la máquina se desbloqueó). Con **Oír** se repite uno.
+
+| Motivo de "No se voceó" | Qué quiere decir |
+|---|---|
+| Solo panel | Esa alerta no llama a nadie, por ejemplo una bolsa fuera de peso |
+| Ya se voceó hace menos de 5 min | El mismo llamado ya sonó; no se repite para no saturar |
+| Llegó con atraso | La terminal estuvo sin señal y el evento llegó tarde; ya no tiene caso vocearlo |
+
+Si una máquina sigue bloqueada, se vuelve a vocear a los 5 y a los 10 minutos (aparece como *Voceado otra vez*). Los tiempos y a quién llama cada alerta se cambian en la pestaña **Configuración**.
 
 ## 5. Pestaña Terminal: sea el operador
 
@@ -210,7 +232,29 @@ Escriba cualquier código y presione **Rastrear**:
 
 Abajo aparecen todos los eventos de ese código en orden, con su CP, resultado y estación. Las OT recientes se pueden abrir con un clic.
 
-## 8. Preguntas frecuentes
+## 8. Pestaña Configuración
+
+Aquí se cambia lo que el cliente quiera ver distinto, sin tocar código. Se guarda en el servidor y se aplica al momento en **todos** los paneles abiertos.
+
+- **Colores de estado:** el verde, ámbar, rojo y gris de las luces del resumen, las tarjetas, la barra de paros y las alertas. Escriba el color en RGB (`31, 138, 76`) o en hexadecimal (`#1f8a4c`), o elíjalo con el selector. También se puede cambiar el nombre de cada estado (por ejemplo *En falla* → *Paro*); los conteos de cada línea usan ese nombre. El número dentro de cada luz cambia solo a blanco o negro para que se lea.
+- **Planta:** el nombre y el subtítulo de la barra superior, y su color.
+- **Colores de los checkpoints:** el color de cada área en la línea CP 01–16.
+- **Voceo:** encenderlo o apagarlo, cuántas veces se repite cada aviso, los tiempos (no repetir, no vocear atrasados, volver a vocear) y la tabla de **qué alerta llama a quién**.
+
+Los colores se ven en vivo mientras se editan, antes de guardar. **Deshacer cambios** vuelve a lo guardado. Si un color está mal escrito, el campo se marca en rojo y no deja guardar.
+
+## 9. Mantenimiento ASETI (solo soporte)
+
+Página para el equipo de ASETI: **http://localhost:8080/aseti.html** (en el servidor, la misma dirección del panel más `/aseti.html`). No aparece en el panel.
+
+Pide la **clave de mantenimiento**. Está en la variable `ASETI_TOKEN` del servidor o, si no se puso, en el archivo `simulador/datos/aseti-token.txt`, que se crea la primera vez. Después de 5 claves equivocadas en un minuto, esa computadora espera un minuto.
+
+- **Diagnóstico:** cada chequeo en *Bien* o *Revisar* (broker MQTT, MES, puente, voceo, terminales, memoria, errores), terminales con problemas, errores recientes, la base de datos y el equipo. **Descargar diagnóstico** guarda todo en un archivo para mandarlo a soporte.
+- **Acciones de mantenimiento:** revisar la integridad de la base, respaldarla, compactar el registro WAL, desbloquear todas las terminales, restablecer la señal LoRa, quitar fallas programadas, prueba de voceo y restablecer la configuración. Las que cambian algo piden un segundo clic. Cada una queda en el **Registro de acciones** con fecha e IP.
+
+Por seguridad, la página solo corre esas acciones; no ejecuta comandos libres del servidor.
+
+## 10. Preguntas frecuentes
 
 **No veo nada en la página.** El servidor no está encendido. Ejecute `npm start` y recargue.
 
@@ -226,9 +270,13 @@ Abajo aparecen todos los eventos de ese código en orden, con su CP, resultado y
 
 **¿Por qué algunos mensajes dicen "entregado con retraso"?** Se generaron sin señal y llegaron después. El sistema guarda la hora real del escaneo, no la de llegada.
 
+**Activé el sonido y no se oye nada.** Revise el volumen de la computadora. Pruebe **Vocear ahora**: si dice *falta el MP3*, se usa la voz del navegador, que en algunas computadoras viene apagada.
+
+**Cambié los colores y otra persona no los ve.** Hay que presionar **Guardar**; hasta entonces solo se ven en su pantalla.
+
 **¿Se pierden datos si se apaga el simulador?** La base de datos se guarda en `simulador/datos/`, pero cada inicio arranca una planta nueva.
 
-## 9. Glosario
+## 11. Glosario
 
 | Término | Significado |
 |---|---|
@@ -243,5 +291,7 @@ Abajo aparecen todos los eventos de ese código en orden, con su CP, resultado y
 | ACK | Confirmación de que un mensaje llegó |
 | Búfer / memoria | Mensajes guardados en la terminal esperando confirmación |
 | Andon | Torreta de luces que indica el estado de la estación |
+| Voceo | Aviso por altavoz que llama a una persona a un lugar |
+| Conmutador | Central telefónica de la planta; reparte el audio a las bocinas y teléfonos Fanvil |
 | SM1 | Estación de empaque donde las bolsas se meten en cajas |
 | Genealogía | Cadena completa: resina → OT → bolsa → caja → tarima → embarque |

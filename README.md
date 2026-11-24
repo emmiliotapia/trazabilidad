@@ -38,8 +38,9 @@ Prueba rápida sin panel: `npm run prueba -- 120` (120 s a 40×, con fallas prog
 | `docs/03_DECISIONES.md` | Registro de decisiones con fecha y motivo |
 | `docs/04_BITACORA.md` | Avances y pendientes por fecha |
 | `docs/05_DOCUMENTACION_TECNICA.md` | Protocolo LoRa, MQTT, gates, base de datos, API y paso a hardware |
-| `docs/06_MANUAL_USUARIO.md` | Cómo usar el simulador: pestañas, misiones de la Terminal, fallas y búsqueda |
-| `simulador/` | Simulación funcional: nodos LoRa, puente a MQTT, MES con genealogía y panel web (`npm start`) |
+| `docs/06_MANUAL_USUARIO.md` | Cómo usar el simulador: pestañas, recorrido guiado, fallas, voceo, configuración y mantenimiento |
+| `simulador/` | Simulación funcional: nodos LoRa, puente a MQTT, MES con genealogía y voceo, panel web (`npm start`) |
+| `voceo/` | Catálogo de avisos de voceo y generador de MP3 con ElevenLabs (los MP3 y la llave no van a git) |
 | `referencias/` | Diagrama de la empresa, foto de la placa y prototipo visual del panel |
 | `PROYECTO_TRAZABILIDAD.md` | **Todo junto en un archivo, para NotebookLM** (generado) |
 

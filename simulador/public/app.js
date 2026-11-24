@@ -1,4 +1,6 @@
 import * as manual from './terminal.js';
+import * as voceo from './voceo.js';
+import * as config from './config.js';
 import { $, h, hora, segmentar, dibujarSegmentos, LEYENDA_TRAMA, opcionesPorLinea } from './comun.js';
 
 // Panel del simulador. Recibe por SSE: estado (cada ~0.8 s), aire (cada trama LoRa),
@@ -214,10 +216,10 @@ function actualizarResumenLineas(e) {
       if (t.sinSenal) sinSenal++;
     }
     f.cuentas.replaceChildren(
-      h('span', { class: 'c verde', text: `${c.verde} produciendo` }),
-      h('span', { class: 'c ambar', text: `${c.ambar} esperando` }),
-      h('span', { class: `c rojo${c.rojo ? ' hay' : ''}`, text: `${c.rojo} en falla` }),
-      c.gris ? h('span', { class: 'c gris', text: `${c.gris} sin OT` }) : '',
+      h('span', { class: 'c verde', text: `${c.verde} ${config.nombreEstado('verde').toLowerCase()}` }),
+      h('span', { class: 'c ambar', text: `${c.ambar} ${config.nombreEstado('ambar').toLowerCase()}` }),
+      h('span', { class: `c rojo${c.rojo ? ' hay' : ''}`, text: `${c.rojo} ${config.nombreEstado('rojo').toLowerCase()}` }),
+      c.gris ? h('span', { class: 'c gris', text: `${c.gris} ${config.nombreEstado('gris').toLowerCase()}` }) : '',
       sinSenal ? h('span', { class: 'c rojo hay', text: `${sinSenal} sin señal` }) : '',
       h('span', { class: 'c', text: `${otsLinea.get(f.linea) ?? 0} OT abiertas` }));
   }
@@ -521,8 +523,10 @@ const es = new EventSource('/api/stream');
 es.addEventListener('inicio', (e) => {
   meta = JSON.parse(e.data);
   manual.configurar(meta);
+  voceo.configurar(meta);
+  config.configurar(meta);
   $('#mqtt-url').textContent = `${meta.mqtt} · ${meta.prefijo}/#`;
-  $('#sel-falla').replaceChildren(...Object.entries(meta.fallas).map(([k, f]) => h('option', { value: k, text: `CP ${String(f.cp).padStart(2, '0')} · ${f.texto}` })));
+  $('#sel-falla').replaceChildren(...Object.entries(meta.fallas).map(([k, f]) => h('option', { value: k, text: `CP ${String(f.cp).padStart(2, '0')} · ${f.texto}${f.vocea ? ` · vocea a ${f.vocea}` : ''}` })));
 });
 let opcionesListas = false;
 es.addEventListener('estado', (e) => {
@@ -539,6 +543,7 @@ es.addEventListener('estado', (e) => {
   }
   actualizarEstado(est);
   manual.alEstado(est);
+  voceo.alEstado(est);
 });
 es.addEventListener('aire', (e) => {
   const t = JSON.parse(e.data);
@@ -550,8 +555,13 @@ es.addEventListener('traza', (e) => {
   mostrarTraza(t);
   manual.alTraza(t);
 });
+es.addEventListener('ajustes', (e) => config.alCambiar(JSON.parse(e.data)));
 es.addEventListener('mes', (e) => manual.alMES(JSON.parse(e.data)));
-es.addEventListener('mqtt', (e) => agregarMQTT(JSON.parse(e.data)));
+es.addEventListener('mqtt', (e) => {
+  const m = JSON.parse(e.data);
+  agregarMQTT(m);
+  voceo.alMQTT(m);
+});
 
 // ───────────── paros en vivo ─────────────
 // Barra fija bajo las pestañas: dice en un vistazo dónde está detenido el proceso ahora mismo.

@@ -36,6 +36,9 @@ El broker MQTT es real: se puede conectar MQTT Explorer o `mosquitto_sub -h loca
 - **Planta:** la pantalla de cada terminal (51 inyectoras en 3 líneas con vista de toda la planta o por línea, MP, mezanina, 4 mesas de SM1 con la pantalla AV, 2 puestos de PT y visión con la matriz o/x), los conteos por CP, las alertas y los controles.
 - **Radio y MQTT:** una trama desarmada byte por byte junto al JSON que publica el puente, el registro del aire (colisiones, pérdidas, RSSI) y el tráfico del broker.
 - **Trazabilidad:** búsqueda por OT, bolsa, caja, tarima o lote de resina, con el árbol de genealogía y el historial de eventos.
+- **Voceo (en Planta):** el MES decide qué alertas se anuncian por altavoz y publica en `aseti/p1/voceo`; el navegador hace de conmutador de prueba. Ver `../voceo/README.md`.
+- **Configuración:** colores de estado del cliente, nombres, colores de CP y reglas del voceo, guardados en el servidor.
+- **Mantenimiento ASETI** (`/aseti.html`, con clave): diagnóstico y acciones de soporte auditadas.
 
 ## Fallas que se pueden provocar
 
@@ -67,4 +70,6 @@ El contenedor `aseti_trazabilidad` escucha en el puerto 8080 dentro de la red `r
 
 Para actualizar: `git pull && docker compose up -d --build`.
 
-El panel no pide usuario y cualquiera con el enlace puede provocar fallas o tomar una terminal. Es una demostración y no guarda datos reales.
+El panel no pide usuario y cualquiera con el enlace puede provocar fallas, tomar una terminal o cambiar la configuración. Es una demostración y no guarda datos reales. La página de mantenimiento (`/aseti.html`) sí pide clave: póngala en `ASETI_TOKEN` en `docker-compose.yml` o léala con `docker exec aseti_trazabilidad cat datos/aseti-token.txt`.
+
+`datos/` queda en el volumen `trazabilidad_datos`, así la configuración, la clave y la auditoría sobreviven a `--build`.

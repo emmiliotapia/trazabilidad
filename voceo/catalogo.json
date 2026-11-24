@@ -1,0 +1,41 @@
+{
+  "_nota": "Catálogo de avisos de voceo. Cada llamado genera un MP3 por destino. La plantilla usa {rol} y {destino}; cada destino trae su preposición (a, al, a la). Los números se escriben con letra para que la voz no diga 'cero uno'.",
+  "plantilla_llamado": "{rol}, favor de acudir {destino}.",
+  "lineas": [22, 20, 9],
+  "estaciones": [
+    { "id": "MP-01",   "texto": "al almacén de materia prima" },
+    { "id": "MEZ-01",  "texto": "a la mezanina" },
+    { "id": "SM1-01",  "texto": "a ese eme uno, mesa uno" },
+    { "id": "SM1-02",  "texto": "a ese eme uno, mesa dos" },
+    { "id": "SM1-03",  "texto": "a ese eme uno, mesa tres" },
+    { "id": "SM1-04",  "texto": "a ese eme uno, mesa cuatro" },
+    { "id": "PT-01",   "texto": "a producto terminado, puesto uno" },
+    { "id": "PT-02",   "texto": "a producto terminado, puesto dos" },
+    { "id": "EMB-01",  "texto": "a embarque" }
+  ],
+  "roles": [
+    { "id": "supervisor",       "texto": "Supervisor de producción", "destinos": ["inyectoras", "estaciones"] },
+    { "id": "mantenimiento",    "texto": "Mantenimiento",            "destinos": ["inyectoras", "estaciones"] },
+    { "id": "calidad",          "texto": "Calidad",                  "destinos": ["inyectoras", "estaciones"] },
+    { "id": "moldes",           "texto": "Técnico de moldes",        "destinos": ["inyectoras"] },
+    { "id": "materiales",       "texto": "Surtidor de resina",       "destinos": ["inyectoras", "MEZ-01"] },
+    { "id": "charolero",        "texto": "Charolero",                "destinos": ["inyectoras"] },
+    { "id": "montacargas",      "texto": "Montacargas",              "destinos": ["MP-01", "MEZ-01", "PT-01", "PT-02", "EMB-01"] },
+    { "id": "primeros_auxilios","texto": "Brigada de primeros auxilios", "destinos": ["inyectoras", "estaciones"] }
+  ],
+  "generales": [
+    { "id": "paro_L1",          "texto": "Atención. Paro de línea uno." },
+    { "id": "paro_L2",          "texto": "Atención. Paro de línea dos." },
+    { "id": "paro_L3",          "texto": "Atención. Paro de línea tres." },
+    { "id": "reanuda_L1",       "texto": "Atención. Línea uno reanuda producción." },
+    { "id": "reanuda_L2",       "texto": "Atención. Línea dos reanuda producción." },
+    { "id": "reanuda_L3",       "texto": "Atención. Línea tres reanuda producción." },
+    { "id": "turno_5min",       "texto": "Atención. El cambio de turno es en cinco minutos." },
+    { "id": "inicio_descanso",  "texto": "Atención. Inicia el horario de descanso." },
+    { "id": "fin_descanso",     "texto": "Atención. Termina el horario de descanso. Favor de regresar a sus puestos." },
+    { "id": "junta_supervisores","texto": "Junta de supervisores en la oficina de producción." },
+    { "id": "sin_resina_mezanina","texto": "Atención mezanina. Resina por debajo del mínimo." },
+    { "id": "embarque_listo",   "texto": "Embarque. Tarima lista para carga." },
+    { "id": "prueba_sistema",   "texto": "Prueba del sistema de voceo. Esto es solo una prueba." }
+  ]
+}

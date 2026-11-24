@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Mantenimiento ASETI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="estilos.css">
+</head>
+<body class="aseti">
+  <header class="barra barra-aseti">
+    <div class="marca">
+      <h1>Mantenimiento ASETI</h1>
+      <p>Diagnóstico y acciones de soporte · uso interno</p>
+    </div>
+    <div></div>
+    <div class="aseti-sesion">
+      <a href="/" class="aseti-volver">Volver al panel</a>
+      <button type="button" class="btn secundario" id="salir" hidden>Cerrar sesión</button>
+    </div>
+  </header>
+
+  <main>
+    <form id="form-clave" class="caja-panel aseti-clave">
+      <h2>Clave de mantenimiento</h2>
+      <p class="nota">Está en la variable <code>ASETI_TOKEN</code> del servidor o en <code>datos/aseti-token.txt</code>. Se guarda solo en esta pestaña.</p>
+      <label for="clave">Clave</label>
+      <div class="aseti-fila">
+        <input id="clave" type="password" autocomplete="current-password" required>
+        <button type="submit">Entrar</button>
+      </div>
+      <p class="aseti-error" id="error-clave" role="alert"></p>
+    </form>
+
+    <div id="contenido" hidden>
+      <div class="aseti-cab">
+        <h2>Diagnóstico <span class="nota" id="generado"></span></h2>
+        <div class="aseti-fila">
+          <button type="button" class="btn secundario" id="actualizar">Actualizar</button>
+          <button type="button" class="btn secundario" id="descargar">Descargar diagnóstico</button>
+        </div>
+      </div>
+      <ul id="chequeos" class="aseti-chequeos"></ul>
+
+      <div class="aseti-cols">
+        <section class="caja-panel">
+          <h3>Acciones de mantenimiento</h3>
+          <p class="nota">Lista fija de acciones; cada una queda registrada con fecha e IP.</p>
+          <ul id="acciones" class="aseti-acciones"></ul>
+        </section>
+        <section class="caja-panel">
+          <h3>Terminales con algún problema</h3>
+          <ul id="problemas" class="aseti-lista"></ul>
+          <h3>Errores y avisos recientes</h3>
+          <ul id="errores" class="aseti-lista aseti-mono"></ul>
+        </section>
+      </div>
+
+      <div class="aseti-cols">
+        <section class="caja-panel">
+          <h3>Base de datos</h3>
+          <dl id="base" class="aseti-datos"></dl>
+          <table class="cfg-reglas"><thead><tr><th scope="col">Tabla</th><th scope="col">Filas</th></tr></thead><tbody id="tablas"></tbody></table>
+        </section>
+        <section class="caja-panel">
+          <h3>Proceso y equipo</h3>
+          <dl id="proceso" class="aseti-datos"></dl>
+          <h3>Registro de acciones</h3>
+          <ul id="auditoria" class="aseti-lista aseti-mono"></ul>
+        </section>
+      </div>
+    </div>
+  </main>
+  <script src="aseti.js" type="module"></script>
+</body>
+</html>

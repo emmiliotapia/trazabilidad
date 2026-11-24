@@ -32,6 +32,7 @@
     <button role="tab" aria-selected="false" data-vista="terminal">Terminal</button>
     <button role="tab" aria-selected="false" data-vista="radio">Radio y MQTT</button>
     <button role="tab" aria-selected="false" data-vista="traza">Trazabilidad</button>
+    <button role="tab" aria-selected="false" data-vista="config">Configuración</button>
   </nav>
 
   <section class="paros" id="paros" data-nivel="ok" aria-live="polite" aria-label="Paros en vivo"></section>
@@ -64,16 +65,34 @@
           <div class="resumen-lineas" id="resumen-lineas"></div>
           <div class="maquinas" id="maquinas" hidden></div>
           <div class="fila-baja">
+            <div class="col-izq">
             <section class="caja-panel alertas">
               <h2>Alertas <span class="nota" id="n-pendientes"></span></h2>
               <ul id="alertas" class="lista-alertas"></ul>
             </section>
+            <section class="caja-panel voceo" aria-labelledby="t-voceo">
+              <h2 id="t-voceo">Voceo por conmutador <span class="nota" id="v-stats"></span></h2>
+              <p class="v-ayuda">Este navegador hace de conmutador: cuando el MES publica en <code>voceo</code>, suena el timbre y el MP3 del aviso. Si falta el MP3, habla la voz del navegador.</p>
+              <div class="v-mando">
+                <button type="button" id="v-sonido" class="v-sonido" aria-pressed="false">Activar sonido en esta computadora</button>
+                <form id="form-voceo" class="form-voceo">
+                  <label>Llamar a <select id="v-rol"></select></label>
+                  <label>Lugar <select id="v-destino"></select></label>
+                  <button type="submit">Vocear ahora</button>
+                </form>
+              </div>
+              <p class="v-ahora" id="v-ahora" aria-live="polite"></p>
+              <p class="v-ayuda" id="v-sin-catalogo" hidden>No se encontró la carpeta <code>voceo/</code> junto al simulador: los avisos se publican sin texto y no se pueden probar a mano.</p>
+              <ul id="v-historial" class="lista-alertas lista-voceo"></ul>
+            </section>
+            </div>
             <section class="caja-panel controles">
               <h2>Provocar una falla</h2>
               <form id="form-falla" class="form-falla">
                 <label>Falla <select id="sel-falla"></select></label>
                 <label>Inyectora <select id="sel-maquina"><option value="">Cualquiera</option></select></label>
                 <button type="submit">Programar falla</button>
+                <p class="v-ayuda">Las fallas de arranque (CP 06) se disparan cuando esa inyectora arranca su siguiente OT, en unos minutos simulados. Para oír un aviso al instante use «Vocear ahora».</p>
               </form>
               <form id="form-senal" class="form-falla">
                 <label>Nodo <select id="sel-nodo"></select></label>
@@ -265,6 +284,60 @@
           <ul class="mqtt" id="mqtt"></ul>
         </section>
       </div>
+    </section>
+
+    <!-- ───────────── CONFIGURACIÓN ───────────── -->
+    <section class="vista" id="vista-config" hidden>
+      <form id="form-config" class="config" novalidate>
+        <div class="cfg-cab">
+          <div>
+            <h2>Configuración</h2>
+            <p class="nota">Se guarda en el servidor y se aplica en todos los paneles abiertos. Los colores se ven en vivo antes de guardar.</p>
+          </div>
+          <div class="cfg-botones">
+            <span class="cfg-estado" id="cfg-estado" aria-live="polite"></span>
+            <button type="button" class="btn secundario" id="cfg-deshacer">Deshacer cambios</button>
+            <button type="submit">Guardar</button>
+          </div>
+        </div>
+
+        <section class="caja-panel">
+          <h3>Colores de estado</h3>
+          <p class="nota">Las luces del resumen, las tarjetas y las alertas. Escriba el color como RGB (<code>31, 138, 76</code>) o hexadecimal (<code>#1f8a4c</code>), o elíjalo con el selector. El texto encima cambia solo a blanco o negro para que se lea.</p>
+          <div id="cfg-estados" class="cfg-lista"></div>
+        </section>
+
+        <section class="caja-panel">
+          <h3>Planta</h3>
+          <div class="cfg-planta">
+            <label>Nombre en la barra superior <input id="cfg-nombre" maxlength="60"></label>
+            <label>Subtítulo <input id="cfg-subtitulo" maxlength="90"></label>
+            <label>Color de la barra superior <input id="cfg-barra" type="color"></label>
+          </div>
+        </section>
+
+        <section class="caja-panel">
+          <h3>Colores de los checkpoints</h3>
+          <p class="nota">El color de cada área en la franja CP 01–16.</p>
+          <div id="cfg-roles" class="cfg-lista"></div>
+        </section>
+
+        <section class="caja-panel">
+          <h3>Voceo por conmutador</h3>
+          <div class="cfg-voceo">
+            <label class="cfg-check"><input type="checkbox" id="cfg-v-activo"> Vocear las alertas</label>
+            <label>Veces que se repite cada aviso <input id="cfg-v-repetir" type="number" min="1" max="3"></label>
+            <label>No vocear si llegó con más de (min) de atraso <input id="cfg-v-maxAtrasoMin" type="number" min="1" max="60"></label>
+            <label>No repetir el mismo llamado antes de (min) <input id="cfg-v-silencioMin" type="number" min="1" max="60"></label>
+            <label>Si sigue bloqueada, volver a vocear cada (min) <input id="cfg-v-escalarMin" type="number" min="1" max="60"></label>
+            <label>Cuántas veces volver a vocear <input id="cfg-v-maxEscalamientos" type="number" min="0" max="5"></label>
+          </div>
+          <table id="cfg-reglas" class="cfg-reglas">
+            <thead><tr><th scope="col">Código</th><th scope="col">Qué pasó</th><th scope="col">A quién se llama</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </section>
+      </form>
     </section>
 
     <!-- ───────────── TRAZABILIDAD ───────────── -->
