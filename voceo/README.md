@@ -11,15 +11,18 @@ Avisos pregrabados para que suenen en las bocinas o teléfonos Fanvil del conmut
 
 ```bash
 cp .env.example .env               # poner ELEVENLABS_API_KEY
-node generar.mjs --voces           # solo si se quiere cambiar la voz (por defecto Ana María, mexicana)
+node generar.mjs --voces           # solo si se quiere cambiar la voz (por defecto Renata, latinoamericana)
 node generar.mjs --seco            # ver los 412 avisos (~26 mil caracteres) sin gastar créditos
 node generar.mjs --solo 3          # probar cómo suena la voz
+node generar.mjs --primeras 10     # los primeros 10 lugares de cada rol (L1-INY-01 a 10) y los generales: 88 avisos, ~5 200 caracteres
 node generar.mjs                   # generar todo (lo que ya existe se salta)
 ```
 
 Se necesita Node 18 o más nuevo. No hay dependencias.
 
 Créditos: ~26 000 caracteres en total. El plan gratuito de ElevenLabs da 10 000 al mes, así que hace falta un plan de pago (Starter o más). Si después cambias un texto, borra solo ese MP3 y vuelve a correr el script.
+
+**Lo generado hoy (2026-11-24):** 88 avisos con la voz Renata (`--primeras 10`): todos los roles en L1-INY-01 a L1-INY-10, montacargas en sus 5 lugares y los 13 generales. La muestra anterior con Ana María (53 avisos) quedó en `salida/ana_maria/`; para volver a ella, copiar esos MP3 a `salida/`.
 
 ## Qué se genera
 
@@ -51,7 +54,7 @@ El servidor del conmutador solo tiene que tocar `archivo` (timbre antes, `repeti
 Para probar sin el simulador:
 
 ```bash
-mosquitto_pub -h <broker> -t aseti/p1/voceo -q 1 -m '{"rol":"supervisor","destino":"L2-INY-07","archivo":"supervisor__L2-INY-07.mp3","repetir":2}'
+mosquitto_pub -h <broker> -t aseti/p1/voceo -q 1 -m '{"rol":"supervisor","destino":"L1-INY-07","archivo":"supervisor__L1-INY-07.mp3","repetir":2}'
 ```
 
 Con el simulador corriendo (`cd simulador && npm start`), el panel tiene «Vocear ahora» para mandar cualquier aviso, y `mosquitto_sub -t 'aseti/p1/voceo'` muestra lo que publica el MES.

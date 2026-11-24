@@ -3,13 +3,15 @@
 //   node generar.mjs --seco              lista los avisos y cuenta caracteres, sin llamar a la API
 //   node generar.mjs --voces             lista las voces de la cuenta (para elegir VOZ_ID)
 //   node generar.mjs --muestra           solo una muestra variada (~50): 4 inyectoras de las 3 líneas y 2 estaciones por rol, más los generales
+//   node generar.mjs --primeras 10       los primeros 10 lugares de cada rol (línea 1), más los generales
 //   node generar.mjs --solo 5            genera solo los primeros 5 (para probar la voz)
 //   node generar.mjs                     genera todo lo que falte en salida/
 //   node generar.mjs --forzar            vuelve a generar aunque el archivo exista
 //
 // Variables (en el entorno o en voceo/.env):
 //   ELEVENLABS_API_KEY  obligatoria
-//   VOZ_ID              voz a usar (por defecto Ana María, mexicana: m7yTemJqdIqrcNleANfX)
+//   VOZ_ID              voz a usar (por defecto Renata, latinoamericana: vTh15aXpXCElYDOJnJK0;
+//                       la anterior era Ana María, mexicana: m7yTemJqdIqrcNleANfX)
 //   MODELO              por defecto eleven_multilingual_v2
 //   FORMATO             por defecto mp3_44100_128
 
@@ -28,7 +30,7 @@ const tiene = (f) => args.includes(f);
 const valor = (f) => { const i = args.indexOf(f); return i >= 0 ? args[i + 1] : undefined; };
 
 const KEY = process.env.ELEVENLABS_API_KEY;
-const VOZ = process.env.VOZ_ID || 'm7yTemJqdIqrcNleANfX'; // Ana María (mexicana, Voice Library)
+const VOZ = process.env.VOZ_ID || 'vTh15aXpXCElYDOJnJK0'; // Renata (latinoamericana, Voice Library)
 const MODELO = process.env.MODELO || 'eleven_multilingual_v2';
 const FORMATO = process.env.FORMATO || 'mp3_44100_128';
 
@@ -37,7 +39,9 @@ const todos = construirAvisos(catalogo);
 const MUESTRA = ['L1-INY-01', 'L1-INY-21', 'L2-INY-07', 'L3-INY-09', 'MEZ-01', 'SM1-02', 'PT-01', 'EMB-01'];
 const avisos = tiene('--muestra')
   ? todos.filter((a) => a.tipo === 'general' || MUESTRA.includes(a.destino)).filter(maxPorRol(6))
-  : todos;
+  : valor('--primeras')
+    ? todos.filter(maxPorRol(Number(valor('--primeras'))))
+    : todos;
 
 if (tiene('--seco')) {
   for (const a of avisos) console.log(`${a.archivo.padEnd(42)} ${a.texto}`);

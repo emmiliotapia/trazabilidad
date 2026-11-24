@@ -73,7 +73,7 @@ async function siguiente() {
     await timbre();
     const ok = await tocarMP3(`/voceo/${a.archivo}`);
     if (!ok) {
-      $('#v-ahora').textContent += ' · falta el MP3, se usa la voz del navegador';
+      $('#v-ahora').textContent += ` · falta el MP3, se usa la voz del navegador${vozRespaldo ? ` (${vozRespaldo.name})` : ''}`;
       await hablar(texto);
     }
     await pausa(700);
@@ -90,10 +90,32 @@ function tocarMP3(url) {
   });
 }
 
+// Respaldo cuando falta el MP3: la mejor voz en español que tenga el navegador.
+// Las neuronales ("Natural" en Edge, "Google" en Chrome) suenan mucho menos robóticas que las de sistema.
+let vozRespaldo = null;
+function elegirVoz() {
+  const puntos = (v) => {
+    const l = v.lang.toLowerCase();
+    if (!l.startsWith('es')) return -1;
+    let p = l === 'es-mx' ? 30 : l === 'es-us' || l === 'es-419' ? 20 : 10;
+    if (/natural|online|neural/i.test(v.name)) p += 100;
+    else if (/google/i.test(v.name)) p += 60;
+    if (!v.localService) p += 5;
+    return p;
+  };
+  const voces = speechSynthesis.getVoices().map((v) => [puntos(v), v]).filter(([p]) => p >= 0).sort((a, b) => b[0] - a[0]);
+  vozRespaldo = voces[0]?.[1] ?? null;
+}
+if ('speechSynthesis' in window) {
+  elegirVoz();
+  speechSynthesis.addEventListener('voiceschanged', elegirVoz);
+}
+
 function hablar(texto) {
   return new Promise((ok) => {
     const u = new SpeechSynthesisUtterance(texto);
-    u.lang = 'es-MX';
+    u.lang = vozRespaldo?.lang ?? 'es-MX';
+    if (vozRespaldo) u.voice = vozRespaldo;
     u.rate = 0.95;
     u.onend = ok;
     u.onerror = ok;

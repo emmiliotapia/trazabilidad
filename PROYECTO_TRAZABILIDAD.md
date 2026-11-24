@@ -1,6 +1,6 @@
 # Proyecto de Trazabilidad · Inyección de plástico (documento consolidado)
 
-> Generado el 2026-11-24 10:00. Este archivo se arma a partir de docs/. No editarlo a mano.
+> Generado el 2026-11-24 10:55. Este archivo se arma a partir de docs/. No editarlo a mano.
 
 
 ---
@@ -334,6 +334,17 @@ En `simulador/` está la arquitectura completa funcionando en software (ver `sim
 
 > **Última actualización:** 2026-11-24
 > Lo más reciente va arriba.
+
+## 2026-11-24 (voz Renata)
+
+**Hecho**
+- Por petición, la voz del voceo cambia a Renata (ElevenLabs, latinoamericana, `vTh15aXpXCElYDOJnJK0`). Generados 88 avisos con `generar.mjs --primeras 10`: todos los roles en L1-INY-01 a L1-INY-10, montacargas en sus 5 lugares y los 13 generales (5 216 caracteres, cabe en el plan gratuito).
+- Los 53 de Ana María se guardaron en `voceo/salida/ana_maria/`.
+- Panel: cuando falta el MP3, la voz del navegador ahora elige la mejor voz en español disponible (las «Natural» de Edge o la de Google en Chrome) en vez de la de sistema, que sonaba robótica.
+
+**Pendiente**
+- Las líneas 2 y 3, la mezanina, SM1 y PT todavía no tienen audio con Renata (salvo montacargas). Para el demo, programar fallas en L1-INY-01 a L1-INY-10.
+- Los 412 completos: ~26 000 caracteres, hace falta el plan Starter.
 
 ## 2026-11-24 (pruebas automáticas)
 
