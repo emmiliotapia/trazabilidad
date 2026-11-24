@@ -6,7 +6,8 @@
   "private": true,
   "scripts": {
     "start": "node --no-warnings src/index.js",
-    "prueba": "node --no-warnings src/index.js --prueba"
+    "prueba": "node --no-warnings src/index.js --prueba",
+    "test": "node --no-warnings --test \"test/*.test.js\""
   },
   "engines": { "node": ">=22.13" },
   "dependencies": {

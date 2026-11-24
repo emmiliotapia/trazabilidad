@@ -1,0 +1,23 @@
+# Corre las pruebas del simulador en cada push y pull request a main.
+name: Pruebas
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  pruebas:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: simulador
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: simulador/package-lock.json
+      - run: npm ci
+      - run: npm test

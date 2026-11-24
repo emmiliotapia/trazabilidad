@@ -27,7 +27,7 @@ docker build -t trazabilidad .
 docker run --rm -p 8080:8080 trazabilidad
 ```
 
-Prueba rápida sin panel: `npm run prueba -- 120` (120 s a 40×, con fallas programadas e informe al final). Las variables de configuración están en [docs/05_DOCUMENTACION_TECNICA.md](docs/05_DOCUMENTACION_TECNICA.md#9-configuración-y-ejecución) y el uso del panel en [docs/06_MANUAL_USUARIO.md](docs/06_MANUAL_USUARIO.md).
+Pruebas automáticas: `npm test` (70 pruebas, unos 2 s; también corren en GitHub en cada push). Prueba rápida sin panel: `npm run prueba -- 120` (120 s a 40×, con fallas programadas e informe al final). Las variables de configuración están en [docs/05_DOCUMENTACION_TECNICA.md](docs/05_DOCUMENTACION_TECNICA.md#9-configuración-y-ejecución) y el uso del panel en [docs/06_MANUAL_USUARIO.md](docs/06_MANUAL_USUARIO.md).
 
 ## Estructura
 

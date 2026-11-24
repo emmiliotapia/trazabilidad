@@ -289,7 +289,10 @@ cd simulador
 npm install
 npm start                 # panel :8080, MQTT :1883
 npm run prueba -- 120     # 120 s sin panel a 40x, con fallas programadas
+npm test                  # pruebas automáticas (70, unos 2 s)
 ```
+
+**Pruebas automáticas.** `simulador/test/` tiene pruebas con `node --test` para el protocolo, los gates de cada terminal, el MES (duplicados y conciliación), el voceo, el catálogo de avisos, la configuración, el mantenimiento y una prueba de punta a punta con broker MQTT real en un puerto libre. GitHub Actions las corre en cada push y pull request (`.github/workflows/pruebas.yml`, Node 22). El detalle por archivo está en `simulador/README.md`. El panel web (HTML y JS del navegador) no tiene pruebas automáticas: se revisa a mano.
 
 | Variable | Por defecto | Efecto |
 |---|---|---|

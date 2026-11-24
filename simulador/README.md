@@ -13,7 +13,25 @@ cd simulador
 npm install
 npm start            # panel en http://localhost:8080 · MQTT en localhost:1883
 npm run prueba -- 120   # corre 120 s sin panel, a 40x, con fallas programadas, y muestra un resumen
+npm test             # pruebas automáticas (unos 2 s)
 ```
+
+## Pruebas automáticas
+
+`npm test` corre las pruebas de `test/` con el corredor de Node (`node --test`), sin dependencias extra. GitHub las corre en cada push a `main` (`.github/workflows/pruebas.yml`); si fallan, el commit aparece con una ✗ roja.
+
+| Archivo | Qué cuida |
+|---|---|
+| `protocolo.test.js` | Codificar y decodificar cada tipo de trama, firma, versión, tamaño del ejemplo de 47 bytes |
+| `estaciones.test.js` | El gate local de cada terminal (CP 01–16) da el código correcto; búfer, ACK, reintentos y comandos repetidos |
+| `mes.test.js` | Duplicados por radio, alertas roja y ámbar, conciliación de eventos atrasados y la alerta a los 10 min, genealogía |
+| `voceo.test.js` | A quién se llama por cada código, silencio de 5 min, atrasos, escalamiento y cancelación al desbloquear |
+| `avisos.test.js` | Catálogo de 412 avisos, números con letra, nombres de archivo seguros |
+| `ajustes.test.js` | La configuración descarta colores, números y roles inválidos y se guarda sin dañar el archivo |
+| `mantenimiento.test.js` | Clave, bloqueo tras 5 intentos, solo acciones de la lista, auditoría |
+| `integracion.test.js` | De punta a punta con broker MQTT real: terminal → LoRa → puente → MES → voceo, y desbloqueo de regreso |
+
+Las pruebas usan un reloj falso para avanzar minutos al instante y una carpeta temporal para la base; no tocan `datos/` ni los puertos 8080/1883.
 
 Variables útiles: `PUERTO_HTTP`, `PUERTO_MQTT`, `VELOCIDAD` (1 = tiempo real; por defecto 10), `LINEAS` (por defecto `22,20,9`), `MESAS_SM1`, `PUESTOS_PT`, `OPERADORES_RESINA`, `BOLSAS_OT`, `INTERVALO_BOLSA` (ms), `PERDIDA` (0–0.9), `TASA_FALLAS`.
 

@@ -3,6 +3,15 @@
 > **Última actualización:** 2026-11-24
 > Lo más reciente va arriba.
 
+## 2026-11-24 (pruebas automáticas)
+
+**Hecho**
+- 70 pruebas en `simulador/test/` con `node --test` (`npm test`, unos 2 s): protocolo LoRa, gate local de cada terminal, MES, voceo, catálogo de avisos, configuración, mantenimiento y una prueba de punta a punta con broker MQTT real.
+- GitHub Actions corre las pruebas en cada push a `main` (`.github/workflows/pruebas.yml`).
+
+**Pendiente**
+- El panel web no tiene pruebas automáticas.
+
 ## 2026-11-24 (voceo por conmutador)
 
 **Hecho**
