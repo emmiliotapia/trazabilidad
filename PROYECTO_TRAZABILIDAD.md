@@ -1,6 +1,6 @@
 # Proyecto de Trazabilidad · Inyección de plástico (documento consolidado)
 
-> Generado el 2026-11-24 09:12. Este archivo se arma a partir de docs/. No editarlo a mano.
+> Generado el 2026-11-24 09:16. Este archivo se arma a partir de docs/. No editarlo a mano.
 
 
 ---
@@ -351,7 +351,6 @@ En `simulador/` está la arquitectura completa funcionando en software (ver `sim
 **Pendiente**
 - Que el cliente pase sus colores y los cargue en Configuración.
 - Decidir si la pestaña Configuración también pide clave en el VPS.
-- Llevar el voceo completo al VPS: copiar `voceo/` (catálogo y MP3) y montarla en el contenedor.
 - Generar los 412 avisos completos (hace falta plan Starter de ElevenLabs) y convertirlos a 8 kHz si el conmutador lo pide.
 - Antes de trabajar, `git pull`: hay cambios que llegan desde otras herramientas.
 - Confirmar con la planta qué alerta llama a quién (tabla en `docs/05`, sección 5.1) y el formato de audio que acepta el conmutador.
@@ -805,7 +804,7 @@ Los números de operadores, mesas y puestos son supuestos (D17).
 - La firma de 4 bytes detecta alteraciones y tramas ajenas, pero no evita que se reenvíe una trama vieja (*replay*). Mitigación prevista: rechazar `ts` fuera de una ventana y `seq` ya vistos.
 - El canal simulado supone un gateway de 8 canales que recibe todos a la vez y transmite sin bloquear la recepción. Un gateway real es *half-duplex*: mientras manda un ACK no escucha. Con 51 terminales conviene medirlo en campo (D16). La prueba de concepto con una Heltec como gateway (opción A) tiene un solo canal.
 - La pantalla AV de SM1 y la cámara de CP 15 se simulan como nodos LoRa; en planta usarán un equipo local (decisión D11).
-- **Voceo en Docker:** la imagen solo copia `simulador/`, así que en el contenedor no está la carpeta `voceo/`. El voceo funciona, pero los avisos se publican sin `texto`, el panel no ofrece «Vocear ahora» y no hay MP3 (los MP3 tampoco van en git). Para tenerlo completo en el servidor hay que copiar `voceo/` y montarla en el contenedor con `VOCEO_DIR`.
+- **Voceo en Docker:** `docker-compose.yml` monta `../voceo` en `/voceo` (solo lectura). El catálogo llega con `git pull`; los MP3 no van en git y hay que copiarlos a `voceo/salida/` en el servidor (por ejemplo con `scp`). Sin MP3, el panel usa la voz del navegador.
 - **La pestaña Configuración no pide clave**, igual que los demás controles del panel: en un servidor público cualquiera con el enlace puede cambiar colores y reglas del voceo.
 
 

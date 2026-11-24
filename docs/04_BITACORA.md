@@ -19,7 +19,6 @@
 **Pendiente**
 - Que el cliente pase sus colores y los cargue en Configuración.
 - Decidir si la pestaña Configuración también pide clave en el VPS.
-- Llevar el voceo completo al VPS: copiar `voceo/` (catálogo y MP3) y montarla en el contenedor.
 - Generar los 412 avisos completos (hace falta plan Starter de ElevenLabs) y convertirlos a 8 kHz si el conmutador lo pide.
 - Antes de trabajar, `git pull`: hay cambios que llegan desde otras herramientas.
 - Confirmar con la planta qué alerta llama a quién (tabla en `docs/05`, sección 5.1) y el formato de audio que acepta el conmutador.

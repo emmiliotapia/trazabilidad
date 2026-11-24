@@ -11,6 +11,7 @@ services:
     mem_limit: 256m
     volumes:
       - trazabilidad_datos:/app/datos   # ajustes del panel, clave de mantenimiento y auditoría
+      - ../voceo:/voceo:ro              # catálogo de avisos y MP3 del voceo (los MP3 se copian a voceo/salida/ a mano: no van en git)
     networks:
       - root_default
 
