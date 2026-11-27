@@ -285,6 +285,7 @@ export class Simulacion {
 
   escanearManual(nombre, codigo) {
     const nodo = this.inyectora(nombre);
+    if (nodo?.placaReal) return { ok: false, mensaje: `${nombre} es una placa física: escanee con el lector conectado a la placa` };
     if (!nodo) return { ok: false, mensaje: 'No existe esa inyectora' };
     if (!this.manual.has(nombre)) return { ok: false, mensaje: 'Tome el control de la terminal primero' };
     const antes = nodo.siguiente;
@@ -303,6 +304,7 @@ export class Simulacion {
 
   pesarManual(nombre, gramos) {
     const nodo = this.inyectora(nombre);
+    if (nodo?.placaReal) return { ok: false, mensaje: `${nombre} es una placa física: escanee con el lector conectado a la placa` };
     if (!nodo || !this.manual.has(nombre)) return { ok: false, mensaje: 'Tome el control de la terminal primero' };
     nodo.pesar(gramos);
     return { ok: true, mensaje: `Báscula: ${Math.round(gramos)} g` };

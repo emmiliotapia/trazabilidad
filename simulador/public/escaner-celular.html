@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="es-MX">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Escáner ASETI · celular</title>
+<style>
+  :root { --tinta: #1d2430; --suave: #5b6575; --linea: #d7dce3; --ok: #1f7a3d; --mal: #b42318; --aviso: #8a5a00; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 16px/1.4 system-ui, "Segoe UI", sans-serif; color: var(--tinta); background: #f6f7f9; }
+  header { padding: 14px 16px; background: #fff; border-bottom: 1px solid var(--linea); }
+  header h1 { font-size: 22px; margin: 0 0 4px; }
+  header p { margin: 0; color: var(--suave); font-size: 14px; }
+  main { padding: 14px 16px 40px; max-width: 520px; margin: 0 auto; }
+  button { font: inherit; padding: 12px 14px; border-radius: 8px; border: 1px solid var(--linea); background: #fff; cursor: pointer; }
+  button.principal { background: #1d4ed8; color: #fff; border-color: #1d4ed8; width: 100%; }
+  button:disabled { opacity: .5; cursor: default; }
+  video { width: 100%; border-radius: 10px; background: #000; margin: 12px 0; display: none; }
+  video.activa { display: block; }
+  .estado { padding: 10px 12px; border-radius: 8px; background: #fff; border: 1px solid var(--linea); margin: 10px 0; }
+  .estado.ok { border-color: var(--ok); color: var(--ok); font-weight: 600; }
+  .estado.mal { border-color: var(--mal); color: var(--mal); font-weight: 600; }
+  .estado.aviso { border-color: var(--aviso); color: var(--aviso); }
+  .respuesta { font-size: 22px; font-weight: 700; padding: 16px; border-radius: 10px; color: #fff; min-height: 70px; display: flex; flex-direction: column; justify-content: center; }
+  .respuesta small { font-size: 15px; font-weight: 400; }
+  .respuesta.PASS { background: var(--ok); }
+  .respuesta.FAIL { background: var(--mal); }
+  .respuesta.INFO { background: #475467; }
+  .fila { display: flex; gap: 8px; margin-top: 10px; }
+  .fila input { flex: 1; font: inherit; padding: 12px; border: 1px solid var(--linea); border-radius: 8px; }
+  h2 { font-size: 15px; margin: 22px 0 6px; color: var(--suave); }
+  ol { padding-left: 20px; margin: 0; font-size: 14px; color: var(--suave); }
+  ol li { margin: 4px 0; }
+  .historial { font: 14px ui-monospace, Consolas, monospace; background: #fff; border: 1px solid var(--linea); border-radius: 8px; padding: 8px 10px; max-height: 260px; overflow: auto; }
+  .historial div { padding: 2px 0; border-bottom: 1px dashed var(--linea); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Escáner ASETI · celular</h1>
+  <p>Conecte la terminal por Bluetooth y lea los QR con la cámara.</p>
+</header>
+<main>
+  <div id="aviso" class="estado aviso" hidden></div>
+
+  <button id="conectar" class="principal" onclick="conectar()">1 · Conectar terminal</button>
+  <div id="estado" class="estado">Sin conectar.</div>
+
+  <button id="camara" class="principal" onclick="alternarCamara()" disabled>2 · Activar cámara</button>
+  <video id="video" playsinline muted></video>
+
+  <div class="fila">
+    <input id="manual" placeholder="o escriba un código y Enter" autocomplete="off" onkeydown="if(event.key==='Enter'){enviarManual()}">
+    <button onclick="enviarManual()">Enviar</button>
+  </div>
+
+  <h2>Última respuesta de la terminal</h2>
+  <div id="respuesta" class="respuesta INFO">—</div>
+
+  <h2>Orden de escaneo (CP 06)</h2>
+  <ol>
+    <li>Gafete del operador (E + número)</li>
+    <li>Número de OT impreso en la carpeta</li>
+    <li>QR de la máquina (QR-L1-INY-01)</li>
+    <li>Después, las etiquetas de bolsa en orden</li>
+  </ol>
+
+  <h2>Historial</h2>
+  <div id="historial" class="historial"></div>
+</main>
+
+<script>
+  // Perfil "UART por BLE" (Nordic UART): el mismo que usa el firmware de la terminal
+  const SERVICIO = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
+  const RX = '6e400002-b5a3-f393-e0a9-e50e24dcca9e'; // el celular escribe aquí
+  const TX = '6e400003-b5a3-f393-e0a9-e50e24dcca9e'; // la terminal responde aquí
+
+  const $ = (id) => document.getElementById(id);
+  let dispositivo = null, escritura = null, camaraActiva = false, flujo = null, detector = null, ultimo = '', ultimoMs = 0;
+  const enc = new TextEncoder(), dec = new TextDecoder();
+
+  // Web Bluetooth y la cámara solo funcionan en HTTPS (o en localhost)
+  if (!window.isSecureContext) {
+    $('aviso').hidden = false;
+    $('aviso').textContent = 'Esta página debe abrirse por HTTPS. Sin HTTPS, el celular no permite Bluetooth ni cámara.';
+  }
+  if (!navigator.bluetooth) {
+    $('aviso').hidden = false;
+    $('aviso').textContent = 'Este navegador no tiene Bluetooth web. Use Chrome en Android.';
+  }
+
+  function estado(texto, clase = '') {
+    $('estado').textContent = texto;
+    $('estado').className = 'estado ' + clase;
+  }
+
+  function registrar(texto) {
+    const d = document.createElement('div');
+    d.textContent = `${new Date().toLocaleTimeString('es-MX')}  ${texto}`;
+    $('historial').prepend(d);
+  }
+
+  async function conectar() {
+    try {
+      dispositivo = await navigator.bluetooth.requestDevice({
+        filters: [{ namePrefix: 'ASETI-' }],
+        optionalServices: [SERVICIO],
+      });
+      // Si se cae el enlace (la placa se reinició, se alejó el celular), se reintenta solo cada 2 s
+      dispositivo.addEventListener('gattserverdisconnected', () => {
+        escritura = null;
+        estado('Se perdió la terminal. Reconectando…', 'aviso');
+        registrar('Enlace perdido: reconectando');
+        setTimeout(reconectar, 2000);
+      });
+      await enlazar();
+    } catch (e) {
+      estado('No se conectó: ' + e.message, 'mal');
+    }
+  }
+
+  async function enlazar() {
+    const servidor = await dispositivo.gatt.connect();
+    const servicio = await servidor.getPrimaryService(SERVICIO);
+    escritura = await servicio.getCharacteristic(RX);
+    const notificar = await servicio.getCharacteristic(TX);
+    await notificar.startNotifications();
+    notificar.addEventListener('characteristicvaluechanged', (e) => alRecibir(dec.decode(e.target.value)));
+    estado(`Conectado a ${dispositivo.name}.`, 'ok');
+    $('camara').disabled = false;
+    registrar(`Conectado a ${dispositivo.name}`);
+  }
+
+  async function reconectar() {
+    if (!dispositivo || dispositivo.gatt.connected) return;
+    try {
+      await enlazar();
+    } catch {
+      setTimeout(reconectar, 2000);
+    }
+  }
+
+  // La terminal manda "COLOR|título|mensaje"
+  function alRecibir(texto) {
+    const [tipo = 'INFO', l1 = '', l2 = ''] = texto.split('|');
+    const r = $('respuesta');
+    r.className = 'respuesta ' + (['PASS', 'FAIL'].includes(tipo) ? tipo : 'INFO');
+    r.innerHTML = `${tipo === 'PASS' ? 'PASS' : tipo === 'FAIL' ? 'FAIL' : 'Aviso'}<small>${escapar(l1)} · ${escapar(l2)}</small>`;
+    registrar(`${tipo}  ${l1} · ${l2}`);
+  }
+
+  const escapar = (s) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+  async function enviar(codigo) {
+    if (!escritura) return estado('Primero conecte la terminal.', 'aviso');
+    const texto = codigo.trim();
+    if (!texto) return;
+    await escritura.writeValueWithoutResponse(enc.encode(texto + '\n'));
+    registrar(`→ ${texto}`);
+  }
+
+  function enviarManual() {
+    enviar($('manual').value);
+    $('manual').value = '';
+  }
+
+  async function alternarCamara() {
+    if (camaraActiva) return apagarCamara();
+    if (!('BarcodeDetector' in window)) {
+      return estado('Este navegador no lee códigos con la cámara. Use el campo de abajo.', 'aviso');
+    }
+    try {
+      detector = new BarcodeDetector({ formats: ['qr_code', 'code_128', 'code_39'] });
+      flujo = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      $('video').srcObject = flujo;
+      $('video').classList.add('activa');
+      await $('video').play();
+      camaraActiva = true;
+      $('camara').textContent = '2 · Apagar cámara';
+      leerCuadros();
+    } catch (e) {
+      estado('No se pudo abrir la cámara: ' + e.message, 'mal');
+    }
+  }
+
+  function apagarCamara() {
+    flujo?.getTracks().forEach((t) => t.stop());
+    $('video').classList.remove('activa');
+    camaraActiva = false;
+    $('camara').textContent = '2 · Activar cámara';
+  }
+
+  async function leerCuadros() {
+    if (!camaraActiva) return;
+    try {
+      const codigos = await detector.detect($('video'));
+      for (const c of codigos) {
+        const ahora = Date.now();
+        // Un mismo código no se manda dos veces en 2 segundos (la cámara lo ve en varios cuadros)
+        if (c.rawValue !== ultimo || ahora - ultimoMs > 2000) {
+          ultimo = c.rawValue;
+          ultimoMs = ahora;
+          enviar(c.rawValue);
+        }
+      }
+    } catch (e) { /* cuadro sin datos: seguir */ }
+    setTimeout(leerCuadros, 250);
+  }
+</script>
+</body>
+</html>

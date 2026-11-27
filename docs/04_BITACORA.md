@@ -1,7 +1,25 @@
 # 04 · Bitácora
 
-> **Última actualización:** 2026-11-24
+> **Última actualización:** 2026-11-27
 > Lo más reciente va arriba.
+
+## 2026-11-27 (dos placas LoRa de prueba)
+
+**Hecho**
+- Llegaron 2 placas: Heltec WiFi LoRa 32 **V2**, radio **SX1276**, **915 MHz**, OLED 0.96" (etiqueta SKU AR3187). Con eso se cierra el pendiente de versión y banda.
+- Traen el demo de fábrica (una transmite paquetes numerados y la otra los recibe). Sobre la mesa: RSSI −63 dBm, SNR 9.25 dB. Las dos radios funcionan.
+- Driver CP210x instalado: las placas quedan en COM7 y COM9. PlatformIO instalado con pip.
+- **Paso 0 aprobado** (`firmware/hola`): pantalla, LED, botón PRG y chip de radio responden con los pines de la V2. Chip ESP32-D0WDQ6.
+- **Paso 2 aprobado** (`firmware/lib/trama` + `firmware/paridad`): el protocolo en C++ arma 5 tramas de ejemplo idénticas byte por byte a `trama.js` (firma incluida) y lee bien un ACK, un comando de cargar OT y rechaza uno alterado. Se corre con `python firmware/paridad/comparar.py COM7`; los ejemplos esperados salen de `simulador/herramientas/vectores-paridad.mjs`.
+- `serialport` (Node 26, Windows) solo entrega los datos recibidos cuando se vuelve a escribir al puerto; por eso la prueba habla con la placa desde Python (pyserial). Queda pendiente decidir cómo lee el puerto el puente del gateway.
+- **Demo de punta a punta con hardware real:** firmware de gateway (COM9) y de terminal L1-INY-01 (COM7). El simulador hace de MES con `GATEWAY_SERIE=COM9`: el MES cargó la OT por radio, y gafete → OT → QR dio PASS (CP 06), la bolsa 1 PASS y la bolsa 3 FAIL por secuencia rota (CP 07), todo en la base con RSSI −52 dBm y sin diferidos. La inyectora simulada queda como gemelo de la placa (`src/radio/gateway-serie.js`); el puerto lo abre `herramientas/serie.py`.
+- Etiquetas QR imprimibles en `/etiquetas.html` (endpoint `/api/qr`, librería `qrcode`).
+- El lector disponible es USB (de teclado), no Bluetooth. Para la prueba, la laptop recibe el escaneo y se lo pasa a la terminal ESP32 por USB; el lector UART (GM65) se conecta directo en planta.
+
+**Pendiente**
+- Prueba de alcance en planta con el demo de fábrica (RSSI, SNR y paquetes seguidos en la inyectora más lejana de cada línea, mezanina y SM1), antes de cargar nuestro firmware.
+- Firmware de la terminal (inyectora, CP 06–07): códigos por USB, gate local, seq, cola, ACK y reintentos.
+- Firmware del gateway y canal serie para el puente (decidir Node 22 o pyserial).
 
 ## 2026-11-24 (voz Renata)
 
@@ -131,3 +149,12 @@
 - Confirmar la versión y la frecuencia de la placa.
 - Definir y conseguir el lector de códigos para la prueba.
 - Prueba de concepto con 2 placas (escaneo → validación → LoRa → gateway).
+
+### 2026-11-27 · Protecciones para la demo con placas reales
+
+- **Problema visto:** al subir firmware la terminal perdió su OT (vive en RAM) y el simulador seguía creyendo que iba a la mitad.
+- **Resincronización** (`simulador/src/radio/gateway-serie.js`): con cada latido (ESTADO) se compara OT y última bolsa de la placa contra el gemelo; si difieren se le manda CARGAR_OT directo con `bolsa` y `operador` (o FIN_OT si su OT ya no está activa). El firmware acepta esos dos campos y reanuda sin repetir el arranque. Sin OT, el latido va cada 10 s.
+- **Hallazgo importante:** tras reiniciar, la placa volvía a numerar sus mensajes desde 1 y el MES los descartaba como repetidos (`UNIQUE(nodo, seq)`): la bolsa quedaba PASS en la placa y no existía en la base. Corregido guardando `seq` en NVS por bloques de 256 (placa nueva: bloque al azar). Aplica también a producción. Sigue pendiente el desborde a los 65 535 eventos (ver 05_DOCUMENTACION_TECNICA).
+- Si el USB del gateway se desconecta, `serie.py` termina y el simulador lo reabre cada 3 s. La página del celular se reconecta sola por BLE.
+- Prueba en placas reales: arranque, 2 bolsas, reinicio, bolsa 3, reinicio, bolsa 4, desconexión del gateway, bolsa 5 → MES con las 5 bolsas, resincronización en ~4 s.
+

@@ -1,6 +1,7 @@
 // Servidor del panel: archivos estáticos, flujo SSE con el estado y API de control.
 // El panel ve dos cosas: (1) lo que pasa por MQTT, igual que lo vería cualquier cliente real,
 // y (2) una "vista de simulación" de las pantallas físicas de cada nodo y del aire LoRa.
+import QRCode from 'qrcode';
 import http from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
@@ -65,6 +66,14 @@ export async function iniciarWeb({ ajustes, mantenimiento, puerto, host, carpeta
       if (url.pathname === '/api/genealogia') {
         const g = mes.genealogia(url.searchParams.get('id'));
         return json(res, g ? 200 : 404, g ?? { error: 'No se encontró ese código' });
+      }
+      if (url.pathname === '/api/qr') {
+        // QR en SVG de cualquier texto corto, para imprimir etiquetas (etiquetas.html)
+        const texto = (url.searchParams.get('texto') ?? '').slice(0, 80);
+        if (!texto) return json(res, 400, { error: 'falta texto' });
+        const svg = await QRCode.toString(texto, { type: 'svg', margin: 1, errorCorrectionLevel: 'M' });
+        res.writeHead(200, { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'max-age=3600' });
+        return res.end(svg);
       }
       if (url.pathname === '/api/manual/etiquetas') {
         const e = sim.etiquetas(url.searchParams.get('maquina'));

@@ -26,6 +26,8 @@ const duracionPrueba = Number(args.find((a) => /^\d+$/.test(a)) ?? 60);
 
 const cfg = CONFIG;
 if (modoPrueba && !process.env.VELOCIDAD) cfg.produccion.velocidad = 40;
+// Con una placa real conectada el reloj va a tiempo real: la placa toma la hora del gateway
+if (process.env.GATEWAY_SERIE && !process.env.VELOCIDAD) cfg.produccion.velocidad = 1;
 const reloj = new Reloj(cfg.produccion.velocidad);
 
 // 1 · Broker MQTT (en planta: Mosquitto)
@@ -87,6 +89,18 @@ await voceo.iniciar();
 
 // 6 · Escenarios (las personas en planta)
 const sim = new Simulacion({ reloj, mes, canal, nodos, cfg: cfg.produccion });
+
+// 6b · Placa real: GATEWAY_SERIE=COM9 conecta el gateway LoRa físico y TERMINAL_REAL (L1-INY-01) pasa a ser
+// la terminal física. Esa máquina queda en modo manual y pide su primera OT sola.
+if (process.env.GATEWAY_SERIE) {
+  const { GatewaySerie } = await import('./radio/gateway-serie.js');
+  const nombre = process.env.TERMINAL_REAL || 'L1-INY-01';
+  const gemelo = nodos.inyectoras.find((n) => n.nombre === nombre);
+  if (!gemelo) throw new Error(`TERMINAL_REAL=${nombre} no existe`);
+  new GatewaySerie({ puerto: process.env.GATEWAY_SERIE, canal, puente, sim, gemelo, claveRed: cfg.claveRed, reloj, porCharola: cfg.produccion.bolsasPorCaja }).iniciar();
+  sim.tomarControl(nombre);
+  sim.pedirOT(nombre);
+}
 
 if (modoPrueba) {
   for (const f of ['resina', 'operador', 'peso', 'bolsaAjena', 'duplicada', 'sinCinta', 'camara', 'saltoCP10']) sim.inyectar(f);

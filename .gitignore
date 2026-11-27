@@ -8,3 +8,4 @@ Thumbs.db
 # Voceo: llave de ElevenLabs y audios generados
 voceo/.env
 voceo/salida/
+__pycache__/

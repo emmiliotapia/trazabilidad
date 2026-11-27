@@ -32,7 +32,7 @@ La regla de fondo: **LoRa solo lleva mensajes cortos entre los nodos y el gatewa
 
 ### Capa 2 · Nodos edge (uno por inyectora y por estación)
 
-- **Placa:** Heltec WiFi LoRa 32 (ESP32 + radio LoRa + OLED). PENDIENTE confirmar versión (V2/SX1276 o V3/SX1262) y banda **915 MHz**.
+- **Placa:** Heltec WiFi LoRa 32 **V2** o compatible (ESP32 clásico + radio **SX1276** + OLED 0.96"), banda **915 MHz**. Confirmado el 2026-11-27 con las 2 placas de prueba (etiqueta: "SX1276 ESP32 LoRa 915 MHz OLED 0.96", SKU AR3187). El ESP32 clásico trae Bluetooth clásico y BLE.
 - **Validación local del gate:** el nodo responde PASS/FAIL al instante, aunque no haya señal.
 - **Datos que el nodo guarda localmente (los recibe del servidor por downlink):**
   - OT activa asignada a esa máquina, SKU de producto y de resina.

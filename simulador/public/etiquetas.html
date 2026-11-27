@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="es-MX">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Etiquetas QR · ASETI</title>
+<style>
+  :root { --tinta: #1d2430; --suave: #5b6575; --linea: #d7dce3; --mal: #b42318; --fondo: #f6f7f9; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.4 system-ui, "Segoe UI", sans-serif; color: var(--tinta); background: var(--fondo); }
+  header { padding: 16px 24px; background: #fff; border-bottom: 1px solid var(--linea); display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+  header h1 { font-size: 18px; margin: 0; }
+  header p { margin: 0; color: var(--suave); }
+  header label { margin-left: auto; color: var(--suave); }
+  header select, header button { font: inherit; padding: 6px 10px; border: 1px solid var(--linea); border-radius: 6px; background: #fff; }
+  main { padding: 16px 24px 40px; }
+  h2 { font-size: 15px; margin: 24px 0 8px; }
+  h2 small { font-weight: 400; color: var(--suave); }
+  .rejilla { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; }
+  .etiqueta { background: #fff; border: 1px solid var(--linea); border-radius: 8px; padding: 10px; text-align: center; break-inside: avoid; }
+  .etiqueta img { width: 140px; height: 140px; display: block; margin: 0 auto 6px; }
+  .codigo { font: 600 14px ui-monospace, Consolas, monospace; word-break: break-all; }
+  .nota { font-size: 12.5px; color: var(--suave); }
+  .etiqueta.mala { border: 2px dashed var(--mal); }
+  .etiqueta.mala .nota { color: var(--mal); font-weight: 600; }
+  .etiqueta.siguiente { border: 2px solid #1f7a3d; }
+  .vacio { color: var(--suave); padding: 24px 0; }
+  @media print {
+    body { background: #fff; }
+    header label, header button { display: none; }
+    main { padding: 0 12px; }
+    .etiqueta { border-color: #999; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Etiquetas QR para la terminal</h1>
+  <p id="resumen">Cargando…</p>
+  <label>Máquina <select id="maquina"></select></label>
+  <button onclick="print()">Imprimir</button>
+</header>
+<main id="contenido"></main>
+<script>
+  const $ = (s) => document.querySelector(s);
+  const params = new URLSearchParams(location.search);
+  let maquina = params.get('maquina') || 'L1-INY-01';
+  let firma = '';
+
+  const qr = (texto) => `/api/qr?texto=${encodeURIComponent(texto)}`;
+  const tarjeta = ({ codigo, nota, malo, siguiente }) =>
+    `<div class="etiqueta${malo ? ' mala' : ''}${siguiente ? ' siguiente' : ''}"><img src="${qr(codigo)}" alt="QR ${codigo}"><div class="codigo">${codigo}</div><div class="nota">${nota ?? ''}</div></div>`;
+  const grupo = (titulo, ayuda, items) => (items.length ? `<h2>${titulo} <small>${ayuda}</small></h2><div class="rejilla">${items.map(tarjeta).join('')}</div>` : '');
+
+  async function cargarMaquinas() {
+    const r = await fetch('/api/manual/etiquetas?maquina=' + encodeURIComponent(maquina));
+    const sel = $('#maquina');
+    const nombres = [];
+    for (const l of [1, 2, 3]) for (let i = 1; i <= 22; i++) nombres.push(`L${l}-INY-${String(i).padStart(2, '0')}`);
+    sel.innerHTML = nombres.map((n) => `<option${n === maquina ? ' selected' : ''}>${n}</option>`).join('');
+    sel.onchange = () => {
+      maquina = sel.value;
+      history.replaceState(null, '', '?maquina=' + maquina);
+      firma = '';
+      actualizar();
+    };
+    return r.ok;
+  }
+
+  async function actualizar() {
+    const r = await fetch('/api/manual/etiquetas?maquina=' + encodeURIComponent(maquina));
+    if (!r.ok) {
+      $('#resumen').textContent = 'No existe esa máquina';
+      return;
+    }
+    const e = await r.json();
+    // Solo se redibuja cuando cambia la OT (así no parpadean los QR)
+    const nueva = `${e.maquina}|${e.ot}|${e.totalBolsas}`;
+    $('#resumen').textContent = e.ot ? `${e.maquina} · OT ${e.ot} · ${e.producto?.descripcion ?? ''} · ${e.totalBolsas} bolsas` : `${e.maquina} · sin OT todavía (${e.fase})`;
+    if (nueva === firma) return;
+    firma = nueva;
+
+    const de = (t) => e.grupos.find((g) => g.titulo === t)?.items ?? [];
+    let html = '';
+    html += grupo('1 · Gafete del operador', 'escanee uno habilitado; E9999 sirve para probar un rechazo', de('Gafetes'));
+    html += grupo('2 · Carpeta de la OT', 'la OT cambia con cada orden: esta página se actualiza sola', de('Carpeta de la OT'));
+    html += grupo('3 · QR fijo de la máquina', 'el de la máquina vecina sirve para probar un rechazo', de('QR fijo de la máquina'));
+    if (e.ot && e.producto) {
+      const p = e.producto;
+      html += grupo('Báscula (demo)', 'sin báscula, la terminal usa el peso nominal; estos códigos fijan el peso de la siguiente bolsa', [
+        { codigo: `PESO-${p.nominal}`, nota: `peso correcto (${p.nominal} ± ${p.tol} g)` },
+        { codigo: `PESO-${p.nominal + 3 * p.tol}`, nota: 'fuera de tolerancia', malo: true },
+      ]);
+      const bolsas = Array.from({ length: e.totalBolsas }, (_, i) => {
+        const k = i + 1;
+        return { codigo: `${e.ot}-B${String(k).padStart(3, '0')}`, nota: `bolsa ${k} de ${e.totalBolsas}`, siguiente: k === e.siguiente };
+      });
+      html += grupo('4 · Etiquetas de bolsa', 'en orden; saltarse una da FAIL (secuencia rota)', bolsas);
+    }
+    $('#contenido').innerHTML = html || '<p class="vacio">Esperando la OT…</p>';
+  }
+
+  cargarMaquinas().then(actualizar);
+  setInterval(actualizar, 3000);
+</script>
+</body>
+</html>
