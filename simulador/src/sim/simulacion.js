@@ -244,7 +244,8 @@ export class Simulacion {
   // después sigue su camino (cajas → tarima) mientras la máquina pasa a la siguiente OT
   async terminarOT(nodo, st) {
     st.fase = 'cierre';
-    await Promise.all(st.charolas.map((c) => c.retirada));
+    // En manual (demo) la máquina no espera a que se lleven las charolas: siguen su camino y la siguiente OT llega antes
+    if (!this.manual.has(nodo.nombre)) await Promise.all(st.charolas.map((c) => c.retirada));
     Promise.all(st.charolas.map((c) => c.caja))
       .then((cajas) => this.flujoTarima(st.ot, cajas, st.producto))
       .catch((e) => console.error(st.ot, e));
@@ -286,6 +287,10 @@ export class Simulacion {
     if (!this.manual.has(nombre)) return { ok: false, mensaje: 'Tome el control de la terminal primero' };
     const st = this.maquinas.get(nombre);
     if (this.solicitudOT.has(nombre)) return { ok: false, mensaje: 'Ya hay una OT solicitada' };
+    if (st?.fase === 'cierre') {
+      this.solicitudOT.add(nombre); // se atiende en cuanto termine de cerrar la anterior
+      return { ok: true, mensaje: `OT solicitada: llega en cuanto cierre la ${st.ot} (alrededor de 1 minuto)` };
+    }
     if (st && st.fase !== 'terminada') return { ok: false, mensaje: `La OT ${st.ot ?? 'nueva'} sigue en curso (${FASES[st.fase] ?? st.fase})` };
     this.solicitudOT.add(nombre);
     return { ok: true, mensaje: 'OT solicitada: planificación (CP 03), resina (CP 04) y sobre (CP 05) en camino' };
