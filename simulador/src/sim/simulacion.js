@@ -112,6 +112,13 @@ export class Simulacion {
       const st = await this.prepararOT(nodo, num);
       if (!st) continue;
       await this.producir(nodo, st);
+      if (st.cancelada) {
+        // Reiniciada desde el panel: las charolas ya llenas siguen su camino; la OT se cancela y la máquina pide otra
+        await this.mes.cancelarOT(st.ot);
+        st.fase = 'terminada';
+        this.log(`${nodo.nombre}: OT ${st.ot} cancelada desde el panel`);
+        continue;
+      }
       await this.terminarOT(nodo, st);
       if (!this.manual.has(nodo.nombre)) await this.esperar(180, 420); // cambio de molde
     }
@@ -178,6 +185,7 @@ export class Simulacion {
   // CP 06–07
   async producir(nodo, st) {
     for (;;) {
+      if (st.cancelada) return;
       if (nodo.ot === st.ot && nodo.siguiente > st.total) return;
       if (this.manual.has(nodo.nombre)) {
         await this.reloj.esperar(2000);
@@ -281,6 +289,18 @@ export class Simulacion {
     if (st && st.fase !== 'terminada') return { ok: false, mensaje: `La OT ${st.ot ?? 'nueva'} sigue en curso (${FASES[st.fase] ?? st.fase})` };
     this.solicitudOT.add(nombre);
     return { ok: true, mensaje: 'OT solicitada: planificación (CP 03), resina (CP 04) y sobre (CP 05) en camino' };
+  }
+
+  // Cancela la OT en curso de una máquina en manual y pide otra (para repetir la demo desde la bolsa 1)
+  reiniciarOT(nombre) {
+    if (!this.manual.has(nombre)) return { ok: false, mensaje: 'Tome el control de la terminal primero' };
+    const st = this.maquinas.get(nombre);
+    if (st?.fase === 'cierre' || st?.fase === 'terminada') return { ok: false, mensaje: `La OT ${st.ot} ya está cerrando` };
+    if (st?.fase !== 'produccion') return { ok: false, mensaje: `Espere: ${FASES[st?.fase] ?? 'preparando la OT'}. Cuando llegue a la terminal se puede reiniciar.` };
+    if (st.cancelada) return { ok: false, mensaje: 'Ya se está reiniciando' };
+    st.cancelada = true;
+    this.solicitudOT.add(nombre);
+    return { ok: true, mensaje: `OT ${st.ot} cancelada. La nueva OT llega a la terminal en unos segundos.` };
   }
 
   escanearManual(nombre, codigo) {

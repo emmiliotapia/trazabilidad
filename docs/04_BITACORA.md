@@ -157,4 +157,6 @@
 - **Hallazgo importante:** tras reiniciar, la placa volvía a numerar sus mensajes desde 1 y el MES los descartaba como repetidos (`UNIQUE(nodo, seq)`): la bolsa quedaba PASS en la placa y no existía en la base. Corregido guardando `seq` en NVS por bloques de 256 (placa nueva: bloque al azar). Aplica también a producción. Sigue pendiente el desborde a los 65 535 eventos (ver 05_DOCUMENTACION_TECNICA).
 - Si el USB del gateway se desconecta, `serie.py` termina y el simulador lo reabre cada 3 s. La página del celular se reconecta sola por BLE.
 - Prueba en placas reales: arranque, 2 bolsas, reinicio, bolsa 3, reinicio, bolsa 4, desconexión del gateway, bolsa 5 → MES con las 5 bolsas, resincronización en ~4 s.
+- **Botón "Reiniciar OT"** en `/etiquetas.html`: cancela la OT en curso (estado `CANCELADA` en la base, FIN_OT a la placa) y pide otra que empieza en la bolsa 1. Solo en fase de producción.
+- **Hallazgo:** al reiniciar el simulador el puente vuelve a numerar sus comandos desde 1 y la placa los tomaba por repetidos (contestaba CMD_ACK pero no los ejecutaba). Corregido en el firmware: un comando es repetido solo si coinciden número **y** contenido (huella FNV-1a del cuerpo).
 

@@ -85,6 +85,7 @@ export async function iniciarWeb({ ajustes, mantenimiento, puerto, host, carpeta
           tomar: () => sim.tomarControl(c.maquina),
           soltar: () => sim.soltarControl(c.maquina),
           pedirOT: () => sim.pedirOT(c.maquina),
+          reiniciarOT: () => sim.reiniciarOT(c.maquina),
           escanear: () => sim.escanearManual(c.maquina, c.codigo),
           desbloquear: () => sim.desbloquearManual(c.maquina),
           pesar: () => sim.pesarManual(c.maquina, Number(c.gramos)),

@@ -142,6 +142,13 @@ export class MES extends EventEmitter {
     await this.comandoConfirmado(o.id_maquina, 'FIN_OT', { ot });
   }
 
+  // Cancelada a media producción (reinicio de la demo): queda en la base con lo que se alcanzó a producir
+  async cancelarOT(ot) {
+    const o = this.q(`SELECT id_maquina FROM ordenes_trabajo WHERE ot = ?`).get(ot);
+    this.q(`UPDATE ordenes_trabajo SET estado = 'CANCELADA' WHERE ot = ? AND estado IN ('LIBERADA', 'EN_PRODUCCION')`).run(ot);
+    await this.comandoConfirmado(o.id_maquina, 'FIN_OT', { ot });
+  }
+
   // ─────────────────────────── eventos de piso ───────────────────────────
   procesarEvento(ev) {
     const d = ev.datos || {};

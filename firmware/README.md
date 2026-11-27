@@ -25,6 +25,8 @@ Placa: **Heltec WiFi LoRa 32 V2** (ESP32 clásico, radio SX1276 a 915 MHz, OLED 
 - *Se desconecta el USB del gateway*: el simulador vuelve a abrir COM9 solo cada 3 s.
 - *Se cae el Bluetooth del celular*: https://escaner.smartopsia.com se reconecta sola a la misma terminal.
 - *La placa conserva una OT que el MES ya cerró*: se le manda FIN_OT.
+- *Se reinicia el simulador o el puente*: sus comandos vuelven a numerarse desde 1; la placa solo descarta un comando como repetido si coinciden número y contenido.
+- *Repetir la demo desde cero*: botón **Reiniciar OT** en `http://localhost:8080/etiquetas.html` (cancela la OT y llega otra en la bolsa 1).
 
 ## Preparar una PC (una sola vez)
 

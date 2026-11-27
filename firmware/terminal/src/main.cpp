@@ -62,7 +62,9 @@ String ot, operadores, operador, lecGafete, lecOT;
 uint16_t total = 0, nominal = 0, tolerancia = 0, siguiente = 1;
 bool arrancada = false, bloqueado = false;
 int pesoManual = -1;
-uint16_t cmdsVistos[16];
+// Comandos ya ejecutados: número + huella del contenido. Si el MES o el puente se reinician vuelven a numerar
+// desde 1; con solo el número, un comando nuevo se tomaría por repetido y se ignoraría.
+uint32_t cmdsVistos[16];
 int cmdsIdx = 0, cmdsCuantos = 0;
 
 // ───── pantalla ─────
@@ -457,10 +459,13 @@ void recibir() {
 
   if (m.tipo == CMD && m.largoCuerpo >= 1) {
     bool repetido = false; // si el CMD_ACK se perdió y el gateway reintenta, no se ejecuta dos veces
+    uint32_t huella = 2166136261u; // FNV-1a del cuerpo, mezclado con el número
+    for (int j = 0; j < (int)m.largoCuerpo; j++) huella = (huella ^ m.cuerpo[j]) * 16777619u;
+    huella ^= (uint32_t)m.seq << 16;
     for (int j = 0; j < cmdsCuantos; j++)
-      if (cmdsVistos[j] == m.seq) repetido = true;
+      if (cmdsVistos[j] == huella) repetido = true;
     if (!repetido) {
-      cmdsVistos[cmdsIdx] = m.seq;
+      cmdsVistos[cmdsIdx] = huella;
       cmdsIdx = (cmdsIdx + 1) % 16;
       if (cmdsCuantos < 16) cmdsCuantos++;
       manejarComando(c[0], c + 1, fin);
