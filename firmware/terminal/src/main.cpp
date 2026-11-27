@@ -287,7 +287,7 @@ void arrancar(const String &gafete, const String &otEscaneada, const String &qr)
   if (c == PASS) {
     arrancada = true;
     operador = gafete;
-    mostrar("OT " + ot, "Arranque OK - " + gafete, VERDE);
+    mostrar("Arranque OK - " + gafete, "Ahora escanee la etiqueta de la bolsa 1", VERDE);
   } else {
     bloqueado = true;
     mostrar("BLOQUEADA", textoFalla(c), ROJO);
@@ -309,7 +309,8 @@ void registrarBolsa(uint16_t k, uint16_t peso) {
   if (c == PASS) {
     siguiente++;
     pesoManual = -1;
-    mostrar("Bolsa " + String(k) + "/" + String(total), String(peso) + " g - OT " + ot, VERDE);
+    mostrar("Bolsa " + String(k) + "/" + String(total) + " OK - " + String(peso) + " g",
+            siguiente > total ? String("OT completa: ultima bolsa registrada") : "Sigue la bolsa " + String(siguiente), VERDE);
   } else {
     String detalle = textoFalla(c);
     if (c == PESO_FUERA_TOLERANCIA) detalle += " (" + String(peso) + " g)";
@@ -378,12 +379,12 @@ void escanear(String c) {
   if (c[0] == 'E' && soloDigitos(c, 1, c.length())) {
     lecGafete = c;
     lecOT = "";
-    return aviso("Gafete " + c + " OK. Escanee la OT");
+    return aviso("Gafete " + c + " OK. Paso 2: escanee la OT");
   }
   if (esOT(c)) {
     if (!lecGafete.length()) return aviso("Primero escanee su gafete");
     lecOT = c;
-    return aviso("OT OK. Escanee el QR de la maquina");
+    return aviso("OT OK. Paso 3: escanee el QR de la maquina");
   }
   if (c.startsWith("QR-")) {
     if (!lecGafete.length() || !lecOT.length()) return aviso("Orden: gafete, OT y despues QR");
@@ -420,7 +421,7 @@ void manejarComando(uint8_t codigo, const uint8_t *p, const uint8_t *fin) {
       arrancada = true;
       mostrar("OT " + ot, "Reanudada: sigue la bolsa " + String(siguiente), VERDE);
     } else {
-      mostrar("OT " + ot, "Escanee gafete, OT y QR", AMBAR);
+      mostrar("OT " + ot, "Paso 1: escanee su gafete", AMBAR);
     }
   } else if (codigo == DESBLOQUEAR) {
     bloqueado = false;
