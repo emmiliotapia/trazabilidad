@@ -3,6 +3,13 @@
 > **Última actualización:** 2026-11-27
 > Lo más reciente va arriba.
 
+## 2026-11-27 (cierre de sesión: pendientes de la demo con placas)
+
+**Pendiente**
+- **Riesgo en `FIN_OT` del firmware de la terminal:** limpia la OT que tenga sin revisar el campo `ot`. Al reiniciar el simulador, la resincronización mandó «cierra la OT-2611-037» y pudo borrar la OT-2611-001 recién cargada. Arreglo: que solo cierre si el número coincide, y volver a subir el programa a la placa (COM7).
+- Elegir el scanner por placa. Recomendado: Steren COM-5965, que lee QR, con adaptador USB-host CH9350. Lo decide el usuario después de probar con el celular.
+- Portal para asignar placas a máquinas por MAC. Está propuesto y no se ha construido.
+
 ## 2026-11-27 (dos placas LoRa de prueba)
 
 **Hecho**
